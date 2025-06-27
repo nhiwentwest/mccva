@@ -264,6 +264,29 @@ start_openresty() {
     sudo pkill -f openresty 2>/dev/null || true
     sleep 3
     
+    # Fix PID file issue - Create necessary directories and files
+    log "Fixing PID file and permissions..."
+    sudo mkdir -p /usr/local/openresty/nginx/logs
+    sudo mkdir -p /var/log/nginx
+    sudo mkdir -p /var/run/nginx
+    sudo mkdir -p /var/run/openresty
+    
+    # Set proper permissions
+    sudo chown -R $CURRENT_USER:$CURRENT_USER /usr/local/openresty/nginx/logs
+    sudo chown -R $CURRENT_USER:$CURRENT_USER /var/log/nginx
+    sudo chown -R $CURRENT_USER:$CURRENT_USER /var/run/nginx
+    sudo chown -R $CURRENT_USER:$CURRENT_USER /var/run/openresty
+    
+    sudo chmod -R 755 /usr/local/openresty/nginx/logs
+    sudo chmod -R 755 /var/log/nginx
+    sudo chmod -R 755 /var/run/nginx
+    sudo chmod -R 755 /var/run/openresty
+    
+    # Create PID file with proper permissions
+    sudo touch /usr/local/openresty/nginx/logs/nginx.pid
+    sudo chown $CURRENT_USER:$CURRENT_USER /usr/local/openresty/nginx/logs/nginx.pid
+    sudo chmod 644 /usr/local/openresty/nginx/logs/nginx.pid
+    
     # Test nginx configuration
     log "Testing nginx configuration..."
     if ! sudo /usr/local/openresty/nginx/sbin/nginx -t; then
@@ -271,18 +294,31 @@ start_openresty() {
         return 1
     fi
     
-    # Start OpenResty
-    log "Starting OpenResty..."
-    sudo systemctl start openresty
-    
-    # Wait for OpenResty to start
-    if ! check_service openresty; then
-        error "OpenResty failed to start"
-        return 1
+    # Try to start OpenResty service first
+    log "Starting OpenResty service..."
+    if sudo systemctl start openresty; then
+        # Wait for OpenResty to start
+        if check_service openresty; then
+            log "✅ OpenResty started successfully via systemctl"
+            return 0
+        fi
     fi
     
-    log "✅ OpenResty started successfully"
-    return 0
+    # If systemctl fails, start manually
+    log "Systemctl failed, starting OpenResty manually..."
+    if sudo /usr/local/openresty/nginx/sbin/nginx; then
+        sleep 2
+        if curl -s http://localhost/health > /dev/null 2>&1; then
+            log "✅ OpenResty started successfully manually"
+            return 0
+        else
+            error "OpenResty manual start failed"
+            return 1
+        fi
+    else
+        error "OpenResty manual start failed"
+        return 1
+    fi
 }
 
 # Start services in order
