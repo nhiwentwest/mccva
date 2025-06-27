@@ -193,8 +193,27 @@ pip install --upgrade pip==23.3.1
 pip install setuptools==68.2.2 wheel==0.41.2
 
 print_status "Installing Python dependencies..."
-# Install dependencies with specific versions
-pip install -r requirements.txt
+# Install dependencies with specific versions for Python 3.12 compatibility
+print_status "Installing numpy first (required for other packages)..."
+pip install numpy==1.26.4
+
+print_status "Installing scipy..."
+pip install scipy==1.12.0
+
+print_status "Installing scikit-learn..."
+pip install scikit-learn==1.4.0
+
+print_status "Installing pandas..."
+pip install pandas==2.2.0
+
+print_status "Installing remaining dependencies..."
+pip install joblib==1.3.2 Flask==3.0.0 Werkzeug==3.0.1 gunicorn==21.2.0 requests==2.31.0
+
+# Install visualization packages if needed
+print_status "Installing visualization packages..."
+pip install matplotlib==3.8.2 seaborn==0.13.0
+
+print_status "✅ All Python dependencies installed successfully"
 
 # Step 9: Verify model files
 print_header "Step 9: Verify Model Files"
