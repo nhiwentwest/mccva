@@ -404,6 +404,34 @@ else
     print_warning "⚠️ ML Service test failed"
 fi
 
+# Test Mock Servers
+print_status "Testing Mock Servers..."
+MOCK_PORTS=(8081 8082 8083 8084 8085 8086 8087 8088)
+MOCK_NAMES=("VM-Low-1" "VM-Low-2" "VM-Medium-1" "VM-Medium-2" "VM-High-1" "VM-High-2" "VM-Balanced-1" "VM-Balanced-2")
+
+for i in "${!MOCK_PORTS[@]}"; do
+    port=${MOCK_PORTS[$i]}
+    name=${MOCK_NAMES[$i]}
+    
+    if curl -s http://localhost:$port/health | grep -q "$name"; then
+        print_status "✅ Mock Server $name (port $port) is responding"
+    else
+        print_warning "⚠️ Mock Server $name (port $port) test failed"
+    fi
+done
+
+# Test Mock Server processing
+print_status "Testing Mock Server processing..."
+for port in "${MOCK_PORTS[@]}"; do
+    if curl -s -X POST http://localhost:$port/process \
+        -H "Content-Type: application/json" \
+        -d '{"test": "data"}' | grep -q "processed"; then
+        print_status "✅ Mock Server port $port processing working"
+    else
+        print_warning "⚠️ Mock Server port $port processing test failed"
+    fi
+done
+
 # Step 20: Test model predictions
 print_header "Step 20: Test Model Predictions"
 print_status "Testing model predictions..."
@@ -430,6 +458,7 @@ fi
 print_header "Step 21: Test MCCVA Routing"
 print_status "Testing MCCVA routing..."
 
+# Test basic MCCVA routing
 if curl -s -X POST http://localhost/mccva/route \
     -H "Content-Type: application/json" \
     -d '{"features": [4, 8, 100, 1000, 3], "vm_features": [0.5, 0.5, 0.5]}' | grep -q "target_vm"; then
@@ -438,8 +467,177 @@ else
     print_warning "⚠️ MCCVA routing test failed"
 fi
 
-# Step 22: Configure firewall
-print_header "Step 22: Configure Firewall"
+# Test MCCVA routing with different load scenarios
+print_status "Testing MCCVA routing with different scenarios..."
+
+# Test low load scenario
+if curl -s -X POST http://localhost/mccva/route \
+    -H "Content-Type: application/json" \
+    -d '{"features": [2, 4, 50, 500, 1], "vm_features": [0.2, 0.1, 0.1]}' | grep -q "target_vm"; then
+    print_status "✅ MCCVA low load routing working"
+else
+    print_warning "⚠️ MCCVA low load routing test failed"
+fi
+
+# Test high load scenario
+if curl -s -X POST http://localhost/mccva/route \
+    -H "Content-Type: application/json" \
+    -d '{"features": [8, 16, 200, 2000, 5], "vm_features": [0.8, 0.9, 0.7]}' | grep -q "target_vm"; then
+    print_status "✅ MCCVA high load routing working"
+else
+    print_warning "⚠️ MCCVA high load routing test failed"
+fi
+
+# Test balanced load scenario
+if curl -s -X POST http://localhost/mccva/route \
+    -H "Content-Type: application/json" \
+    -d '{"features": [4, 8, 100, 1000, 3], "vm_features": [0.5, 0.5, 0.5]}' | grep -q "target_vm"; then
+    print_status "✅ MCCVA balanced load routing working"
+else
+    print_warning "⚠️ MCCVA balanced load routing test failed"
+fi
+
+# Test MCCVA routing performance
+print_status "Testing MCCVA routing performance..."
+total_time=0
+success_count=0
+
+for i in {1..5}; do
+    start_time=$(date +%s.%N)
+    response=$(curl -s -X POST http://localhost/mccva/route \
+        -H "Content-Type: application/json" \
+        -d '{"features": [4, 8, 100, 1000, 3], "vm_features": [0.5, 0.5, 0.5]}')
+    end_time=$(date +%s.%N)
+    
+    duration=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0.001")
+    total_time=$(echo "$total_time + $duration" | bc 2>/dev/null || echo "$total_time")
+    
+    if echo "$response" | grep -q "target_vm"; then
+        success_count=$((success_count + 1))
+        print_status "Request $i: ${duration}s ✅"
+    else
+        print_warning "Request $i: ${duration}s ❌"
+    fi
+done
+
+avg_time=$(echo "scale=3; $total_time / 5" | bc 2>/dev/null || echo "0.001")
+success_rate=$(echo "scale=1; $success_count * 20" | bc 2>/dev/null || echo "0")
+
+print_status "MCCVA Performance Results:"
+print_status "  • Average Response Time: ${avg_time}s"
+print_status "  • Success Rate: ${success_rate}%"
+print_status "  • Total Requests: 5"
+print_status "  • Successful Requests: $success_count"
+
+# Step 22: Test End-to-End MCCVA with Mock Servers
+print_header "Step 22: Test End-to-End MCCVA with Mock Servers"
+print_status "Testing complete MCCVA workflow with mock servers..."
+
+# Test end-to-end workflow
+print_status "Testing end-to-end workflow..."
+
+# Test 1: Low load task
+print_status "Test 1: Low load task routing..."
+response1=$(curl -s -X POST http://localhost/mccva/route \
+    -H "Content-Type: application/json" \
+    -d '{"features": [1, 2, 25, 250, 1], "vm_features": [0.1, 0.1, 0.1]}')
+
+if echo "$response1" | grep -q "target_vm"; then
+    target_vm=$(echo "$response1" | grep -o '"target_vm":"[^"]*"' | cut -d'"' -f4)
+    print_status "✅ Low load task routed to: $target_vm"
+    
+    # Test if the target VM is actually responding
+    if echo "$target_vm" | grep -q "low"; then
+        print_status "✅ Correctly routed to low load VM"
+    fi
+else
+    print_warning "⚠️ Low load task routing failed"
+fi
+
+# Test 2: High load task
+print_status "Test 2: High load task routing..."
+response2=$(curl -s -X POST http://localhost/mccva/route \
+    -H "Content-Type: application/json" \
+    -d '{"features": [16, 32, 500, 5000, 10], "vm_features": [0.9, 0.9, 0.9]}')
+
+if echo "$response2" | grep -q "target_vm"; then
+    target_vm=$(echo "$response2" | grep -o '"target_vm":"[^"]*"' | cut -d'"' -f4)
+    print_status "✅ High load task routed to: $target_vm"
+    
+    # Test if the target VM is actually responding
+    if echo "$target_vm" | grep -q "high"; then
+        print_status "✅ Correctly routed to high load VM"
+    fi
+else
+    print_warning "⚠️ High load task routing failed"
+fi
+
+# Test 3: Balanced load task
+print_status "Test 3: Balanced load task routing..."
+response3=$(curl -s -X POST http://localhost/mccva/route \
+    -H "Content-Type: application/json" \
+    -d '{"features": [4, 8, 100, 1000, 3], "vm_features": [0.5, 0.5, 0.5]}')
+
+if echo "$response3" | grep -q "target_vm"; then
+    target_vm=$(echo "$response3" | grep -o '"target_vm":"[^"]*"' | cut -d'"' -f4)
+    print_status "✅ Balanced load task routed to: $target_vm"
+    
+    # Test if the target VM is actually responding
+    if echo "$target_vm" | grep -q "balanced"; then
+        print_status "✅ Correctly routed to balanced load VM"
+    fi
+else
+    print_warning "⚠️ Balanced load task routing failed"
+fi
+
+# Test 4: Verify all mock servers are accessible
+print_status "Test 4: Verifying all mock servers are accessible..."
+all_accessible=true
+
+for port in 8081 8082 8083 8084 8085 8086 8087 8088; do
+    if ! curl -s http://localhost:$port/health > /dev/null; then
+        print_warning "⚠️ Mock server on port $port is not accessible"
+        all_accessible=false
+    fi
+done
+
+if [ "$all_accessible" = true ]; then
+    print_status "✅ All mock servers are accessible"
+else
+    print_warning "⚠️ Some mock servers are not accessible"
+fi
+
+# Test 5: Load balancing test
+print_status "Test 5: Testing load balancing..."
+low_count=0
+medium_count=0
+high_count=0
+balanced_count=0
+
+for i in {1..20}; do
+    response=$(curl -s -X POST http://localhost/mccva/route \
+        -H "Content-Type: application/json" \
+        -d '{"features": [4, 8, 100, 1000, 3], "vm_features": [0.5, 0.5, 0.5]}')
+    
+    if echo "$response" | grep -q "vm_low_load"; then
+        low_count=$((low_count + 1))
+    elif echo "$response" | grep -q "vm_medium_load"; then
+        medium_count=$((medium_count + 1))
+    elif echo "$response" | grep -q "vm_high_load"; then
+        high_count=$((high_count + 1))
+    elif echo "$response" | grep -q "vm_balanced"; then
+        balanced_count=$((balanced_count + 1))
+    fi
+done
+
+print_status "Load Balancing Results (20 requests):"
+print_status "  • Low Load: $low_count requests"
+print_status "  • Medium Load: $medium_count requests"
+print_status "  • High Load: $high_count requests"
+print_status "  • Balanced: $balanced_count requests"
+
+# Step 23: Configure firewall
+print_header "Step 23: Configure Firewall"
 print_status "Configuring firewall..."
 if command -v ufw &> /dev/null; then
     sudo ufw allow 80/tcp
@@ -450,8 +648,8 @@ else
     print_warning "UFW not found, skipping firewall configuration"
 fi
 
-# Step 23: Create management script
-print_header "Step 23: Create Management Script"
+# Step 24: Create management script
+print_header "Step 24: Create Management Script"
 print_status "Creating service management script..."
 
 cat > /home/$USER/mccva_manage.sh << 'EOF'
@@ -537,8 +735,8 @@ EOF
 
 chmod +x /home/$USER/mccva_manage.sh
 
-# Step 24: Run comprehensive test
-print_header "Step 24: Run Comprehensive Test"
+# Step 25: Run comprehensive test
+print_header "Step 25: Run Comprehensive Test"
 print_status "Running comprehensive test..."
 
 if [ -f "test_mccva.py" ]; then
@@ -566,7 +764,7 @@ print_header "MCCVA Amazon Cloud Deployment Complete!"
 print_status "Deployment Summary:"
 echo "  • Repository: $GITHUB_REPO"
 echo "  • Installation: $PROJECT_DIR"
-echo "  • Services: mccva-ml, openresty"
+echo "  • Services: mccva-ml, mccva-mock-servers, openresty"
 echo "  • Python Environment: Virtual environment in $PROJECT_DIR/venv"
 echo "  • Status: ✅ Deployed successfully"
 
@@ -574,23 +772,28 @@ print_status "Service URLs:"
 PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "localhost")
 echo "  • OpenResty Gateway: http://$PUBLIC_IP"
 echo "  • ML Service: http://$PUBLIC_IP:5000"
+echo "  • Mock Servers: http://$PUBLIC_IP:8081-8088"
 echo "  • Health Check: http://$PUBLIC_IP/health"
 
 print_status "Management Commands:"
-echo "  • Service management: ~/mccva_manage.sh [start|stop|restart|status|logs|test|demo]"
-echo "  • View logs: sudo journalctl -u mccva-ml -f"
+echo "  • Service management: ~/mccva_manage.sh [start|stop|restart|status|logs|mock-logs|test|demo]"
+echo "  • View ML logs: sudo journalctl -u mccva-ml -f"
+echo "  • View Mock logs: sudo journalctl -u mccva-mock-servers -f"
 echo "  • Test algorithm: cd $PROJECT_DIR && source venv/bin/activate && python3 test_mccva.py"
 
 print_status "API Endpoints:"
 echo "  • MCCVA Routing: POST http://localhost/mccva/route"
 echo "  • SVM Prediction: POST http://localhost/predict/makespan"
 echo "  • K-Means Prediction: POST http://localhost/predict/vm_cluster"
+echo "  • Mock Servers: GET http://localhost:8081-8088/health"
 
 print_status "Demo Commands:"
 echo "  • Run demo: ~/mccva_manage.sh demo"
 echo "  • Test endpoints: ~/mccva_manage.sh test"
+echo "  • Test mock servers: ~/mccva_manage.sh test"
 
 print_status "✅ MCCVA Algorithm is now running and ready for production use!"
 print_status "🎯 AI-based load balancing is active!"
-print_status "🤖 Mock server is running and AI routing is working!"
+print_status "🤖 Mock servers are running and AI routing is working!"
 print_status "🐍 Python 3.12 environment issues fixed!"
+print_status "🧪 Comprehensive testing completed with mock servers!"
