@@ -14,13 +14,13 @@ import logging
 import os
 import sys
 
-# Cấu hình logging cho production
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('/var/log/mccva-ml.log') if os.path.exists('/var/log') else logging.StreamHandler()
+        logging.FileHandler('/var/log/mccva/mccva-ml.log') if os.path.exists('/var/log/mccva') else logging.StreamHandler(),
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)

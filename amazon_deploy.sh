@@ -292,8 +292,33 @@ print_header "Step 14: Test Nginx Configuration"
 print_status "Testing nginx configuration..."
 sudo /usr/local/openresty/nginx/sbin/nginx -t
 
-# Step 15: Create systemd service
-print_header "Step 15: Create Systemd Service"
+# Step 15: Create log directories and set permissions
+print_header "Step 15: Create Log Directories and Set Permissions"
+print_status "Creating log directories and setting permissions..."
+
+# Create log directories
+sudo mkdir -p /var/log/mccva
+sudo mkdir -p /var/log/nginx
+sudo mkdir -p /usr/local/openresty/nginx/logs
+
+# Set permissions
+sudo chown -R $USER:$USER /var/log/mccva
+sudo chmod -R 755 /var/log/mccva
+sudo chown -R $USER:$USER /usr/local/openresty/nginx/logs
+sudo chmod -R 755 /usr/local/openresty/nginx/logs
+
+# Create log files
+sudo touch /var/log/mccva/mccva-ml.log
+sudo touch /var/log/mccva/mccva-mock-servers.log
+sudo chown $USER:$USER /var/log/mccva/mccva-ml.log
+sudo chown $USER:$USER /var/log/mccva/mccva-mock-servers.log
+sudo chmod 644 /var/log/mccva/mccva-ml.log
+sudo chmod 644 /var/log/mccva/mccva-mock-servers.log
+
+print_status "✅ Log directories and permissions set"
+
+# Step 16: Create systemd service
+print_header "Step 16: Create Systemd Service"
 print_status "Creating systemd service for ML service..."
 
 sudo tee /etc/systemd/system/mccva-ml.service > /dev/null <<EOF
@@ -341,8 +366,8 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-# Step 16: Start services
-print_header "Step 16: Start Services"
+# Step 17: Start services
+print_header "Step 17: Start Services"
 print_status "Starting services..."
 
 sudo systemctl daemon-reload
@@ -353,13 +378,13 @@ sudo systemctl start mccva-mock-servers
 sudo systemctl enable openresty
 sudo systemctl start openresty
 
-# Step 17: Wait for services
-print_header "Step 17: Wait for Services"
+# Step 18: Wait for services
+print_header "Step 18: Wait for Services"
 print_status "Waiting for services to start..."
 sleep 20
 
-# Step 18: Check service status
-print_header "Step 18: Check Service Status"
+# Step 19: Check service status
+print_header "Step 19: Check Service Status"
 if service_is_running mccva-ml; then
     print_status "✅ MCCVA ML Service is running"
 else
@@ -386,8 +411,8 @@ else
     exit 1
 fi
 
-# Step 19: Test endpoints
-print_header "Step 19: Test Endpoints"
+# Step 20: Test endpoints
+print_header "Step 20: Test Endpoints"
 print_status "Testing endpoints..."
 
 # Test health endpoint
@@ -432,8 +457,8 @@ for port in "${MOCK_PORTS[@]}"; do
     fi
 done
 
-# Step 20: Test model predictions
-print_header "Step 20: Test Model Predictions"
+# Step 21: Test model predictions
+print_header "Step 21: Test Model Predictions"
 print_status "Testing model predictions..."
 
 # Test SVM prediction
@@ -454,8 +479,8 @@ else
     print_warning "⚠️ K-Means prediction test failed"
 fi
 
-# Step 21: Test MCCVA routing
-print_header "Step 21: Test MCCVA Routing"
+# Step 22: Test MCCVA routing
+print_header "Step 22: Test MCCVA Routing"
 print_status "Testing MCCVA routing..."
 
 # Test basic MCCVA routing
@@ -529,8 +554,8 @@ print_status "  • Success Rate: ${success_rate}%"
 print_status "  • Total Requests: 5"
 print_status "  • Successful Requests: $success_count"
 
-# Step 22: Test End-to-End MCCVA with Mock Servers
-print_header "Step 22: Test End-to-End MCCVA with Mock Servers"
+# Step 23: Test End-to-End MCCVA with Mock Servers
+print_header "Step 23: Test End-to-End MCCVA with Mock Servers"
 print_status "Testing complete MCCVA workflow with mock servers..."
 
 # Test end-to-end workflow
@@ -636,20 +661,24 @@ print_status "  • Medium Load: $medium_count requests"
 print_status "  • High Load: $high_count requests"
 print_status "  • Balanced: $balanced_count requests"
 
-# Step 23: Configure firewall
-print_header "Step 23: Configure Firewall"
+# Step 24: Configure firewall
+print_header "Step 24: Configure Firewall"
 print_status "Configuring firewall..."
 if command -v ufw &> /dev/null; then
     sudo ufw allow 80/tcp
     sudo ufw allow 5000/tcp
     sudo ufw allow 22/tcp
+    # Allow mock server ports
+    for port in 8081 8082 8083 8084 8085 8086 8087 8088; do
+        sudo ufw allow $port/tcp
+    done
     print_status "✅ Firewall configured"
 else
     print_warning "UFW not found, skipping firewall configuration"
 fi
 
-# Step 24: Create management script
-print_header "Step 24: Create Management Script"
+# Step 25: Create management script
+print_header "Step 25: Create Management Script"
 print_status "Creating service management script..."
 
 cat > /home/$USER/mccva_manage.sh << 'EOF'
@@ -735,8 +764,8 @@ EOF
 
 chmod +x /home/$USER/mccva_manage.sh
 
-# Step 25: Run comprehensive test
-print_header "Step 25: Run Comprehensive Test"
+# Step 26: Run comprehensive test
+print_header "Step 26: Run Comprehensive Test"
 print_status "Running comprehensive test..."
 
 if [ -f "test_mccva.py" ]; then
