@@ -156,7 +156,21 @@ print_header "Step 7: Clone GitHub Repository"
 if [ -d "$PROJECT_DIR/.git" ]; then
     print_status "Repository already exists, updating..."
     cd $PROJECT_DIR
+    
+    # Check if there are local changes
+    if ! git diff --quiet; then
+        print_status "Local changes detected, stashing them..."
+        git stash push -m "Auto-stash before deployment update"
+    fi
+    
+    # Pull latest changes
     git pull origin main
+    
+    # Apply stashed changes if any
+    if git stash list | grep -q "Auto-stash before deployment update"; then
+        print_status "Applying stashed changes..."
+        git stash pop
+    fi
 else
     print_status "Cloning MCCVA repository..."
     cd /tmp
