@@ -317,20 +317,46 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+# Create systemd service for mock servers
+print_status "Creating systemd service for mock servers..."
+
+sudo tee /etc/systemd/system/mccva-mock-servers.service > /dev/null <<EOF
+[Unit]
+Description=MCCVA Mock Servers
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$PROJECT_DIR
+Environment=PATH=$PROJECT_DIR/venv/bin
+Environment=PYTHONPATH=$PROJECT_DIR
+ExecStart=$PROJECT_DIR/venv/bin/python mock_servers.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # Step 16: Start services
 print_header "Step 16: Start Services"
 print_status "Starting services..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable mccva-ml
+sudo systemctl enable mccva-mock-servers
 sudo systemctl start mccva-ml
+sudo systemctl start mccva-mock-servers
 sudo systemctl enable openresty
 sudo systemctl start openresty
 
 # Step 17: Wait for services
 print_header "Step 17: Wait for Services"
 print_status "Waiting for services to start..."
-sleep 15
+sleep 20
 
 # Step 18: Check service status
 print_header "Step 18: Check Service Status"
@@ -340,6 +366,15 @@ else
     print_error "❌ MCCVA ML Service failed to start"
     sudo systemctl status mccva-ml
     sudo journalctl -u mccva-ml --no-pager -n 20
+    exit 1
+fi
+
+if service_is_running mccva-mock-servers; then
+    print_status "✅ MCCVA Mock Servers are running"
+else
+    print_error "❌ MCCVA Mock Servers failed to start"
+    sudo systemctl status mccva-mock-servers
+    sudo journalctl -u mccva-mock-servers --no-pager -n 20
     exit 1
 fi
 
@@ -428,19 +463,22 @@ cat > /home/$USER/mccva_manage.sh << 'EOF'
 case "$1" in
     start)
         echo "Starting MCCVA services..."
-        sudo systemctl start mccva-ml openresty
+        sudo systemctl start mccva-ml mccva-mock-servers openresty
         ;;
     stop)
         echo "Stopping MCCVA services..."
-        sudo systemctl stop mccva-ml openresty
+        sudo systemctl stop mccva-ml mccva-mock-servers openresty
         ;;
     restart)
         echo "Restarting MCCVA services..."
-        sudo systemctl restart mccva-ml openresty
+        sudo systemctl restart mccva-ml mccva-mock-servers openresty
         ;;
     status)
         echo "MCCVA ML Service:"
         sudo systemctl status mccva-ml --no-pager
+        echo ""
+        echo "MCCVA Mock Servers:"
+        sudo systemctl status mccva-mock-servers --no-pager
         echo ""
         echo "OpenResty:"
         sudo systemctl status openresty --no-pager
@@ -449,6 +487,10 @@ case "$1" in
         echo "MCCVA ML Service logs:"
         sudo journalctl -u mccva-ml -f
         ;;
+    mock-logs)
+        echo "MCCVA Mock Servers logs:"
+        sudo journalctl -u mccva-mock-servers -f
+        ;;
     test)
         echo "Testing MCCVA endpoints..."
         echo "Health Check:"
@@ -456,6 +498,12 @@ case "$1" in
         echo ""
         echo "ML Service Health:"
         curl -s http://localhost:5000/health | jq . 2>/dev/null || curl -s http://localhost:5000/health
+        echo ""
+        echo "Mock Servers Health:"
+        for port in 8081 8082 8083 8084 8085 8086 8087 8088; do
+            echo "Port $port:"
+            curl -s http://localhost:$port/health | jq . 2>/dev/null || curl -s http://localhost:$port/health
+        done
         ;;
     demo)
         echo "Running MCCVA Demo..."
@@ -481,7 +529,7 @@ case "$1" in
             -d '{"features": [2, 4, 50, 500, 1], "vm_features": [0.3, 0.2, 0.1]}'
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|logs|test|demo}"
+        echo "Usage: $0 {start|stop|restart|status|logs|mock-logs|test|demo}"
         exit 1
         ;;
 esac
