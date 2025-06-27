@@ -161,11 +161,19 @@ print_status "Creating log directories..."
 sudo mkdir -p /var/log/nginx
 sudo mkdir -p /usr/local/openresty/nginx/logs
 sudo mkdir -p /var/www/html
+sudo mkdir -p /var/run
 
 sudo chown -R ubuntu:ubuntu /var/log/nginx
 sudo chmod -R 755 /var/log/nginx
+sudo chown -R ubuntu:ubuntu /usr/local/openresty/nginx/logs
+sudo chmod -R 755 /usr/local/openresty/nginx/logs
 
-print_success "✅ Log directories created"
+# Create PID directory
+sudo mkdir -p /var/run/nginx
+sudo chown ubuntu:ubuntu /var/run/nginx
+sudo chmod 755 /var/run/nginx
+
+print_success "✅ Log directories and PID directory created"
 
 # Step 4: Kill any existing nginx processes
 print_header "Step 4: Kill Existing Nginx Processes"
