@@ -315,6 +315,13 @@ sudo chown $USER:$USER /var/log/mccva/mccva-mock-servers.log
 sudo chmod 644 /var/log/mccva/mccva-ml.log
 sudo chmod 644 /var/log/mccva/mccva-mock-servers.log
 
+# Fix project directory permissions
+if [ -d "$PROJECT_DIR" ]; then
+    sudo chown -R $USER:$USER $PROJECT_DIR
+    sudo chmod -R 755 $PROJECT_DIR
+    print_status "✅ Project directory permissions fixed"
+fi
+
 print_status "✅ Log directories and permissions set"
 
 # Step 16: Create systemd service
