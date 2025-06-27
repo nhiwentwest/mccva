@@ -756,25 +756,51 @@ case "$1" in
     demo)
         echo "Running MCCVA Demo..."
         echo "1. Testing SVM Prediction:"
-        curl -s -X POST http://localhost/predict/makespan \
+        response=$(curl -s -X POST http://localhost/predict/makespan \
             -H "Content-Type: application/json" \
-            -d '{"features": [2, 4, 50, 500, 1]}' | jq . 2>/dev/null || curl -s -X POST http://localhost/predict/makespan \
-            -H "Content-Type: application/json" \
-            -d '{"features": [2, 4, 50, 500, 1]}'
+            -d '{"features": [4, 8, 100, 1000, 3]}')
+        if echo "$response" | jq . 2>/dev/null; then
+            echo "✅ SVM Prediction working"
+        else
+            echo "Response: $response"
+            echo "⚠️ SVM Prediction test failed"
+        fi
+        
         echo ""
         echo "2. Testing K-Means Clustering:"
-        curl -s -X POST http://localhost/predict/vm_cluster \
+        response=$(curl -s -X POST http://localhost/predict/vm_cluster \
             -H "Content-Type: application/json" \
-            -d '{"vm_features": [0.3, 0.2, 0.1]}' | jq . 2>/dev/null || curl -s -X POST http://localhost/predict/vm_cluster \
-            -H "Content-Type: application/json" \
-            -d '{"vm_features": [0.3, 0.2, 0.1]}'
+            -d '{"vm_features": [0.5, 0.5, 0.5]}')
+        if echo "$response" | jq . 2>/dev/null; then
+            echo "✅ K-Means Clustering working"
+        else
+            echo "Response: $response"
+            echo "⚠️ K-Means Clustering test failed"
+        fi
+        
         echo ""
         echo "3. Testing MCCVA Routing:"
-        curl -s -X POST http://localhost/mccva/route \
+        response=$(curl -s -X POST http://localhost/mccva/route \
             -H "Content-Type: application/json" \
-            -d '{"features": [2, 4, 50, 500, 1], "vm_features": [0.3, 0.2, 0.1]}' | jq . 2>/dev/null || curl -s -X POST http://localhost/mccva/route \
-            -H "Content-Type: application/json" \
-            -d '{"features": [2, 4, 50, 500, 1], "vm_features": [0.3, 0.2, 0.1]}'
+            -d '{"features": [4, 8, 100, 1000, 3], "vm_features": [0.5, 0.5, 0.5]}')
+        if echo "$response" | jq . 2>/dev/null; then
+            echo "✅ MCCVA Routing working"
+        else
+            echo "Response: $response"
+            echo "⚠️ MCCVA Routing test failed"
+        fi
+        
+        echo ""
+        echo "4. Testing Mock Servers:"
+        for port in 8081 8082 8083 8084 8085 8086 8087 8088; do
+            response=$(curl -s http://localhost:$port/health)
+            if echo "$response" | jq . 2>/dev/null; then
+                echo "✅ Mock server port $port working"
+            else
+                echo "Port $port response: $response"
+                echo "⚠️ Mock server port $port test failed"
+            fi
+        done
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|status|logs|mock-logs|test|demo}"
