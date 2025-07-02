@@ -15,7 +15,7 @@ if [ -d "/home/$CURRENT_USER/mccva" ]; then log "Copy project từ home..."; cp 
 log "Tạo virtualenv Python..."; if [ -d "venv" ]; then rm -rf venv; fi; python3 -m venv venv; source venv/bin/activate; pip install --upgrade pip
 log "Cài đặt Python packages..."; pip install numpy==1.26.4 scipy==1.12.0 scikit-learn==1.4.0 pandas==2.2.0 joblib==1.3.2 Flask==3.0.0 Werkzeug==3.0.1 gunicorn==21.2.0 requests==2.31.0 matplotlib==3.8.2 seaborn==0.13.0
 python -c "import numpy, scipy, sklearn, pandas, joblib, flask; print('✅ All packages installed successfully')"
-log "Tạo thư mục log và set quyền..."; sudo mkdir -p /var/log/mccva /var/log/nginx /usr/local/openresty/nginx/logs /var/www/html /var/run/nginx /var/run/openresty; sudo chown -R $CURRENT_USER:$CURRENT_USER /var/log/mccva /var/log/nginx /usr/local/openresty/nginx/logs /var/run/nginx /var/run/openresty; sudo chmod -R 755 /var/log/mccva /var/log/nginx /usr/local/openresty/nginx/logs /var/run/nginx /var/run/openresty
+log "Tạo thư mục log và set quyền..."; sudo mkdir -p /var/log/mccva /var/log/nginx /var/www/html /var/run/nginx /var/run/openresty; sudo chown -R $CURRENT_USER:$CURRENT_USER /var/log/mccva /var/log/nginx /var/run/nginx /var/run/openresty; sudo chmod -R 755 /var/log/mccva /var/log/nginx /var/run/nginx /var/run/openresty
 log "Tạo systemd service..."
 sudo tee /etc/systemd/system/mccva-ml.service > /dev/null <<EOF
 [Unit]

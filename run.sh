@@ -5,12 +5,6 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 log() { echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] $1${NC}"; }
 error() { echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"; }
 CURRENT_USER=$(whoami)
-sudo mkdir -p /usr/local/openresty/nginx/logs
-sudo chown -R $(whoami):$(whoami) /usr/local/openresty/nginx/logs
-sudo chmod -R 755 /usr/local/openresty/nginx/logs
-sudo touch /usr/local/openresty/nginx/logs/nginx.pid
-sudo chown $(whoami):$(whoami) /usr/local/openresty/nginx/logs/nginx.pid
-sudo chmod 644 /usr/local/openresty/nginx/logs/nginx.pid
 log "Reload systemd..."; sudo systemctl daemon-reload
 log "Start ML Service..."; sudo systemctl start mccva-ml
 log "Start Mock Servers..."; sudo systemctl start mccva-mock-servers
