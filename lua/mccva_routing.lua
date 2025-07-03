@@ -225,40 +225,64 @@ if ngx.req.get_method() == "POST" then
         -- Step 3: MCCVA Algorithm - Chọn VM tối ưu
         local target_vm, routing_info = mccva_select_vm(makespan, cluster, confidence, vm_features)
         
-        -- Step 4: Forward request to selected VM
-        local client = http.new()
-        local res, err = client:request_uri(target_vm, {
-            method = "POST",
-            body = body,
-            headers = {
-                ["Content-Type"] = "application/json",
-                ["X-MCCVA-Method"] = routing_info.method,
-                ["X-Makespan"] = makespan,
-                ["X-Cluster"] = tostring(cluster),
-                ["X-Confidence"] = tostring(confidence),
-                ["X-Algorithm"] = routing_info.algorithm or "unknown"
-            }
-        })
-        
-        if res then
-            -- Add MCCVA routing info to response
-            local response_data = cjson.decode(res.body)
-            response_data.routing_info = routing_info
-            response_data.target_vm = target_vm
-            response_data.mccva_decision = {
-                makespan_prediction = makespan,
-                cluster_prediction = cluster,
-                confidence_score = confidence,
-                algorithm_used = routing_info.algorithm,
-                ensemble_score = routing_info.ensemble_score
-            }
-            
-            ngx.header.content_type = "application/json"
-            ngx.say(cjson.encode(response_data))
-        else
-            ngx.status = 500
-            ngx.say(cjson.encode({error = "MCCVA routing failed: " .. (err or "unknown error")}))
+        -- Step 4: Forward request to selected VM with retry/fallback
+        local tried_vms = {}
+        local function try_forward(vm_url, method_label)
+            local client = http.new()
+            local res, err = client:request_uri(vm_url, {
+                method = "POST",
+                body = body,
+                headers = {
+                    ["Content-Type"] = "application/json",
+                    ["X-MCCVA-Method"] = routing_info.method .. (method_label or ""),
+                    ["X-Makespan"] = makespan,
+                    ["X-Cluster"] = tostring(cluster),
+                    ["X-Confidence"] = tostring(confidence),
+                    ["X-Algorithm"] = routing_info.algorithm or "unknown"
+                }
+            })
+            table.insert(tried_vms, {vm=vm_url, err=err})
+            return res, err
         end
+
+        local res, err = try_forward(target_vm, "")
+        -- Nếu lỗi, thử backup (nếu có)
+        if (not res or res.status >= 500) and routing_info then
+            local backup_vm = nil
+            -- Tìm backup VM từ mapping
+            for _, mapping in pairs(mccva_server_mapping) do
+                for k, v in pairs(mapping) do
+                    if v.primary == target_vm and v.backup then
+                        backup_vm = v.backup
+                    end
+                end
+            end
+            if backup_vm and backup_vm ~= target_vm then
+                local res2, err2 = try_forward(backup_vm, "_backup")
+                if res2 then
+                    local response_data = cjson.decode(res2.body)
+                    response_data.routing_info = routing_info
+                    response_data.target_vm = backup_vm
+                    response_data.mccva_decision = {
+                        makespan_prediction = makespan,
+                        cluster_prediction = cluster,
+                        confidence_score = confidence,
+                        algorithm_used = routing_info.algorithm,
+                        ensemble_score = routing_info.ensemble_score
+                    }
+                    response_data.retry = true
+                    response_data.tried_vms = tried_vms
+                    ngx.header.content_type = "application/json"
+                    ngx.say(cjson.encode(response_data))
+                    return
+                else
+                    err = err2 or err
+                end
+            end
+        end
+        -- Nếu vẫn lỗi, trả về lỗi cuối cùng và log lại các VM đã thử
+        ngx.status = 500
+        ngx.say(cjson.encode({error = "MCCVA routing failed: " .. (err or "unknown error"), tried_vms = tried_vms}))
     else
         ngx.status = 400
         ngx.say(cjson.encode({error = "No request body"}))
