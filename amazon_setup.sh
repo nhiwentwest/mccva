@@ -71,4 +71,35 @@ sudo mkdir -p /usr/local/openresty/nginx/logs
 sudo chown -R ubuntu:ubuntu /usr/local/openresty/nginx/logs
 sudo chmod -R 755 /usr/local/openresty/nginx/logs
 
+# Cài đặt Docker nếu chưa có
+if ! command -v docker &> /dev/null; then
+  log "Cài đặt Docker..."; 
+  curl -fsSL https://get.docker.com -o get-docker.sh; 
+  sh get-docker.sh; 
+  sudo usermod -aG docker $CURRENT_USER; 
+  rm get-docker.sh
+else
+  log "Docker đã được cài đặt."
+fi
+
+# Tạo Dockerfile cho ml_service.py nếu chưa có
+if [ ! -f Dockerfile ]; then
+  log "Tạo Dockerfile cho ML Service..."
+  cat <<EOF > Dockerfile
+FROM python:3.10-slim
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 5000
+CMD ["python", "ml_service.py"]
+EOF
+else
+  log "Đã có Dockerfile."
+fi
+
+# Build Docker image cho ML Service
+log "Build Docker image cho ML Service..."
+docker build -t mccva-ml-service .
+
 log "✅ Cài đặt hoàn tất! Chạy run.sh để khởi động hệ thống." 

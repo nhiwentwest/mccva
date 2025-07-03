@@ -31,7 +31,21 @@ sudo chown -R $NGINX_USER:$NGINX_USER /usr/local/openresty/nginx/logs
 sudo chmod -R 755 /usr/local/openresty/nginx/logs
 
 log "Reload systemd..."; sudo systemctl daemon-reload
-log "Start ML Service..."; sudo systemctl start mccva-ml
+
+# Stop systemd ML service nếu đang chạy
+if systemctl is-active --quiet mccva-ml; then
+  log "Stop systemd ML Service để dùng Docker..."; sudo systemctl stop mccva-ml
+fi
+
+# Stop container cũ nếu có
+if docker ps -a --format '{{.Names}}' | grep -q '^mccva-ml$'; then
+  log "Xóa container ML Service cũ..."; docker rm -f mccva-ml
+fi
+
+# Run ML Service bằng Docker
+log "Chạy ML Service bằng Docker..."
+docker run -d --name mccva-ml -p 5000:5000 --restart unless-stopped mccva-ml-service
+
 log "Start Mock Servers..."; sudo systemctl start mccva-mock-servers
 log "Start OpenResty..."; sudo systemctl start openresty || true
 sleep 5
