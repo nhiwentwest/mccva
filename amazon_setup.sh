@@ -53,4 +53,22 @@ WantedBy=multi-user.target
 EOF
 sudo systemctl daemon-reload
 log "Cài đặt nginx.conf và Lua..."; if [ -f "/etc/nginx/nginx.conf" ]; then sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup; fi; sudo cp nginx.conf /etc/nginx/nginx.conf; sudo mkdir -p /usr/local/openresty/nginx/conf/lua; sudo cp lua/*.lua /usr/local/openresty/nginx/conf/lua/
+
+# Đảm bảo dòng pid trong nginx.conf trùng với systemd
+NGINX_CONF="/usr/local/openresty/nginx/conf/nginx.conf"
+PIDFILE="/usr/local/openresty/nginx/logs/nginx.pid"
+
+# Sửa dòng pid trong nginx.conf nếu chưa đúng
+if grep -q "^pid " "$NGINX_CONF"; then
+    sudo sed -i "s|^pid .*;|pid $PIDFILE;|" "$NGINX_CONF"
+else
+    # Nếu chưa có dòng pid, thêm vào sau worker_processes
+    sudo sed -i "/worker_processes/a pid $PIDFILE;" "$NGINX_CONF"
+fi
+
+# Tạo thư mục logs và set quyền đúng
+sudo mkdir -p /usr/local/openresty/nginx/logs
+sudo chown -R ubuntu:ubuntu /usr/local/openresty/nginx/logs
+sudo chmod -R 755 /usr/local/openresty/nginx/logs
+
 log "✅ Cài đặt hoàn tất! Chạy run.sh để khởi động hệ thống." 

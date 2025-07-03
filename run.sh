@@ -16,9 +16,19 @@ else
   MOCK_SERVER_COUNT=8
 fi
 
-# Fix quyền logs nếu cần
-sudo chown -R $NGINX_USER:$NGINX_USER $LOGS_DIR
-sudo chmod -R 755 $LOGS_DIR
+# Đảm bảo dòng pid trong nginx.conf trùng với systemd
+NGINX_CONF="/usr/local/openresty/nginx/conf/nginx.conf"
+PIDFILE="/usr/local/openresty/nginx/logs/nginx.pid"
+
+if grep -q "^pid " "$NGINX_CONF"; then
+    sudo sed -i "s|^pid .*;|pid $PIDFILE;|" "$NGINX_CONF"
+else
+    sudo sed -i "/worker_processes/a pid $PIDFILE;" "$NGINX_CONF"
+fi
+
+sudo mkdir -p /usr/local/openresty/nginx/logs
+sudo chown -R $NGINX_USER:$NGINX_USER /usr/local/openresty/nginx/logs
+sudo chmod -R 755 /usr/local/openresty/nginx/logs
 
 log "Reload systemd..."; sudo systemctl daemon-reload
 log "Start ML Service..."; sudo systemctl start mccva-ml
