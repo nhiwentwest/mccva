@@ -62,8 +62,8 @@ class MCCVAAdvancedTester:
             self.log_test("ML Service Health", False, str(e))
     
     def test_routing_consistency(self):
-        """Test routing consistency với cùng input"""
-        print("\n=== Routing Consistency Test ===")
+        """Test routing consistency với cùng input - Updated for load balancing"""
+        print("\n=== Routing Consistency Test (Load Balancing Aware) ===")
         
         test_data = {
             "cpu_cores": 4,
@@ -92,14 +92,22 @@ class MCCVAAdvancedTester:
                 self.log_test(f"Routing Consistency {i+1}", False, str(e))
                 return
         
-        # Check consistency
-        consistent_routing = len(servers_used) == 1
+        # Check prediction consistency (should be same)
         consistent_prediction = len(set(predictions)) == 1
         
-        self.log_test("Routing Consistency", consistent_routing, 
-                     f"Servers used: {servers_used}")
+        # For load balancing, multiple servers is expected and good
+        # Check that we're using a reasonable number of servers (not just 1, not all 8)
+        load_balanced = 1 < len(servers_used) <= 4  # Reasonable distribution
+        
         self.log_test("Prediction Consistency", consistent_prediction, 
                      f"Predictions: {set(predictions)}")
+        self.log_test("Load Balancing Distribution", load_balanced, 
+                     f"Servers used: {servers_used} (count: {len(servers_used)})")
+        
+        # Overall consistency: prediction should be consistent, servers can vary
+        overall_consistent = consistent_prediction and load_balanced
+        self.log_test("Overall Routing Consistency", overall_consistent, 
+                     f"Prediction consistent: {consistent_prediction}, Load balanced: {load_balanced}")
     
     def test_load_balancing(self):
         """Test load balancing với different priorities"""
@@ -139,6 +147,135 @@ class MCCVAAdvancedTester:
         
         self.log_test("Load Balancing Distribution", balanced, 
                      f"Server distribution: {server_counts}")
+    
+    def test_load_balancing_validation(self):
+        """Test load balancing behavior với different scenarios"""
+        print("\n=== Load Balancing Validation Test ===")
+        
+        scenarios = [
+            {
+                "name": "Low Priority Requests",
+                "data": {"cpu_cores": 2, "memory": 4, "storage": 50, "network_bandwidth": 500, "priority": 1},
+                "expected_servers": [1, 2]  # Should prefer low priority servers
+            },
+            {
+                "name": "High Priority Requests",
+                "data": {"cpu_cores": 8, "memory": 16, "storage": 200, "network_bandwidth": 2000, "priority": 5},
+                "expected_servers": [5, 6, 7, 8]  # Should prefer high priority servers
+            },
+            {
+                "name": "Medium Priority Requests",
+                "data": {"cpu_cores": 4, "memory": 8, "storage": 100, "network_bandwidth": 1000, "priority": 3},
+                "expected_servers": [3, 4, 5]  # Should prefer medium priority servers
+            }
+        ]
+        
+        for scenario in scenarios:
+            servers_used = set()
+            
+            # Test 5 requests per scenario
+            for i in range(5):
+                try:
+                    response = requests.post(f"{self.base_url}/mccva/route", 
+                                           json=scenario["data"], timeout=15)
+                    if response.status_code == 200:
+                        result = response.json()
+                        server_num = int(result.get("server").split("_")[1])
+                        servers_used.add(server_num)
+                    else:
+                        self.log_test(f"Load Balancing {scenario['name']}", False, 
+                                    f"Status: {response.status_code}")
+                        return
+                except Exception as e:
+                    self.log_test(f"Load Balancing {scenario['name']}", False, str(e))
+                    return
+            
+            # Check if servers used are within expected range
+            expected_range = scenario["expected_servers"]
+            servers_in_range = any(server in expected_range for server in servers_used)
+            
+            self.log_test(f"Load Balancing {scenario['name']}", servers_in_range, 
+                         f"Servers used: {servers_used}, Expected range: {expected_range}")
+    
+    def test_production_readiness(self):
+        """Test production readiness criteria"""
+        print("\n=== Production Readiness Test ===")
+        
+        # Test 1: High availability
+        availability_tests = 20
+        successful_requests = 0
+        
+        for i in range(availability_tests):
+            try:
+                test_data = {
+                    "cpu_cores": random.randint(1, 16),
+                    "memory": random.randint(1, 64),
+                    "storage": random.randint(10, 1000),
+                    "network_bandwidth": random.randint(100, 10000),
+                    "priority": random.randint(1, 5)
+                }
+                
+                response = requests.post(f"{self.base_url}/mccva/route", 
+                                       json=test_data, timeout=10)
+                if response.status_code == 200:
+                    successful_requests += 1
+            except:
+                pass
+        
+        availability_rate = (successful_requests / availability_tests) * 100
+        high_availability = availability_rate >= 95
+        
+        self.log_test("High Availability", high_availability, 
+                     f"Availability rate: {availability_rate:.1f}% ({successful_requests}/{availability_tests})")
+        
+        # Test 2: Response time consistency
+        response_times = []
+        for i in range(10):
+            try:
+                test_data = {
+                    "cpu_cores": 4,
+                    "memory": 8,
+                    "storage": 100,
+                    "network_bandwidth": 1000,
+                    "priority": 3
+                }
+                
+                start_time = time.time()
+                response = requests.post(f"{self.base_url}/mccva/route", 
+                                       json=test_data, timeout=10)
+                end_time = time.time()
+                
+                if response.status_code == 200:
+                    response_times.append(end_time - start_time)
+            except:
+                pass
+        
+        if response_times:
+            avg_response_time = statistics.mean(response_times)
+            max_response_time = max(response_times)
+            consistent_performance = avg_response_time < 1.0 and max_response_time < 2.0
+            
+            self.log_test("Consistent Performance", consistent_performance, 
+                         f"Avg: {avg_response_time:.3f}s, Max: {max_response_time:.3f}s")
+        else:
+            self.log_test("Consistent Performance", False, "No successful requests")
+        
+        # Test 3: Error handling
+        try:
+            response = requests.post(f"{self.base_url}/mccva/route", 
+                                   data="invalid json", 
+                                   headers={"Content-Type": "application/json"}, 
+                                   timeout=10)
+            proper_error_handling = response.status_code == 400
+            self.log_test("Error Handling", proper_error_handling, 
+                         f"Status: {response.status_code}")
+        except Exception as e:
+            self.log_test("Error Handling", False, str(e))
+        
+        # Overall production readiness
+        production_ready = high_availability and consistent_performance and proper_error_handling
+        self.log_test("Production Ready", production_ready, 
+                     f"All criteria met: {production_ready}")
     
     def test_stress_loading(self):
         """Stress test với concurrent requests"""
@@ -336,10 +473,12 @@ class MCCVAAdvancedTester:
         self.test_ml_service_health()
         self.test_routing_consistency()
         self.test_load_balancing()
+        self.test_load_balancing_validation()
         self.test_stress_loading()
         self.test_failure_scenarios()
         self.test_edge_cases()
         self.test_system_resilience()
+        self.test_production_readiness()
         
         end_time = time.time()
         total_time = end_time - start_time
