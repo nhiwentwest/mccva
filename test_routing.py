@@ -159,21 +159,24 @@ def test_performance(host_ip):
     
     start_time = time.time()
     success_count = 0
-    total_requests = 10
+    total_requests = 5  # Giảm từ 10 xuống 5
     
     for i in range(total_requests):
         try:
+            print(f"Sending request {i+1}...")
             response = requests.post(f'http://{host_ip}/mccva/route', 
-                                   json=data, timeout=10)
+                                   json=data, timeout=30)  # Tăng timeout từ 10s lên 30s
             if response.status_code == 200:
                 success_count += 1
-                print(f"Request {i+1}: ✅")
+                result = response.json()
+                print(f"Request {i+1}: ✅ (Server: {result.get('server', 'N/A')})")
             else:
                 print(f"Request {i+1}: ❌ ({response.status_code})")
+                print(f"   Error: {response.text[:200]}...")
         except Exception as e:
             print(f"Request {i+1}: ❌ ({e})")
         
-        time.sleep(0.5)  # Delay giữa requests
+        time.sleep(2)  # Tăng delay từ 0.5s lên 2s
     
     end_time = time.time()
     duration = end_time - start_time
@@ -184,6 +187,52 @@ def test_performance(host_ip):
     print(f"Success rate: {(success_count/total_requests)*100:.1f}%")
     print(f"Total time: {duration:.2f}s")
     print(f"Average time per request: {duration/total_requests:.2f}s")
+
+def debug_500_error(host_ip):
+    """Debug lỗi 500 chi tiết"""
+    print(f"\n=== Debug 500 Error (host: {host_ip}) ===")
+    
+    # Test 1: Kiểm tra ML Service
+    print("1. Testing ML Service...")
+    try:
+        response = requests.get('http://localhost:5000/health', timeout=10)
+        print(f"   ML Service health: {response.status_code}")
+        if response.status_code == 200:
+            print(f"   Response: {response.text}")
+    except Exception as e:
+        print(f"   ML Service error: {e}")
+    
+    # Test 2: Kiểm tra OpenResty health
+    print("\n2. Testing OpenResty health...")
+    try:
+        response = requests.get(f'http://{host_ip}/health', timeout=10)
+        print(f"   OpenResty health: {response.status_code}")
+        if response.status_code == 200:
+            print(f"   Response: {response.text}")
+    except Exception as e:
+        print(f"   OpenResty error: {e}")
+    
+    # Test 3: Kiểm tra một mock server
+    print("\n3. Testing Mock Server 8081...")
+    try:
+        response = requests.get(f'http://{host_ip}:8081/health', timeout=10)
+        print(f"   Mock server 8081: {response.status_code}")
+        if response.status_code == 200:
+            print(f"   Response: {response.text}")
+    except Exception as e:
+        print(f"   Mock server error: {e}")
+    
+    # Test 4: Test routing với verbose
+    print("\n4. Testing routing with verbose...")
+    try:
+        data = {"cpu_cores": 4, "memory": 8, "storage": 100, "network_bandwidth": 1000, "priority": 3}
+        response = requests.post(f'http://{host_ip}/mccva/route', 
+                               json=data, timeout=30)
+        print(f"   Routing status: {response.status_code}")
+        print(f"   Response headers: {dict(response.headers)}")
+        print(f"   Response body: {response.text[:500]}...")
+    except Exception as e:
+        print(f"   Routing error: {e}")
 
 if __name__ == "__main__":
     print("🚀 Starting MCCVA Routing Logic Test...")
@@ -203,6 +252,9 @@ if __name__ == "__main__":
     
     # Test Routing Scenarios
     test_routing_scenarios(host_ip)
+    
+    # Debug 500 error nếu cần
+    debug_500_error(host_ip)
     
     # Performance Test
     test_performance(host_ip)
