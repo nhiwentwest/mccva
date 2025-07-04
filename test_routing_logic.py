@@ -2,6 +2,7 @@
 """
 Test script cho MCCVA routing logic và retry/fallback
 Kiểm tra các kịch bản: bình thường, server lỗi, concurrent requests
+Có thể chạy trong Docker container hoặc trên host
 """
 
 import requests
@@ -10,12 +11,26 @@ import time
 import threading
 import subprocess
 import sys
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 
 class MCCVATester:
-    def __init__(self, base_url: str = "http://localhost"):
-        self.base_url = base_url
+    def __init__(self, base_url: str = None, in_docker: bool = False):
+        # Tự động detect môi trường
+        if base_url is None:
+            if in_docker or os.path.exists('/.dockerenv'):
+                # Chạy trong Docker container
+                self.base_url = "http://host.docker.internal"  # Truy cập host từ container
+                self.in_docker = True
+            else:
+                # Chạy trên host
+                self.base_url = "http://localhost"
+                self.in_docker = False
+        else:
+            self.base_url = base_url
+            self.in_docker = in_docker
+            
         self.mock_ports = list(range(8081, 8089))  # 8081-8088
         self.test_data = {
             "cpu_cores": 4,
@@ -24,6 +39,9 @@ class MCCVATester:
             "network_bandwidth": 1000,
             "priority": 3
         }
+        
+        print(f"🔧 Test environment: {'Docker Container' if self.in_docker else 'Host'}")
+        print(f"🔧 Base URL: {self.base_url}")
     
     def test_health_endpoints(self) -> Dict[str, bool]:
         """Test health của tất cả mock servers"""
@@ -86,19 +104,32 @@ class MCCVATester:
     
     def kill_mock_server(self, port: int) -> bool:
         """Tắt mock server trên port cụ thể"""
-        try:
-            subprocess.run(f"sudo fuser -k {port}/tcp", shell=True, check=True)
-            print(f"  🔴 Killed mock server on port {port}")
-            time.sleep(2)  # Đợi process tắt hoàn toàn
-            return True
-        except subprocess.CalledProcessError:
-            print(f"  ⚠️  No process found on port {port}")
+        if self.in_docker:
+            print(f"  ⚠️  Cannot kill server from Docker container (port {port})")
+            print(f"     Please kill manually: sudo fuser -k {port}/tcp")
             return False
+        else:
+            try:
+                subprocess.run(f"sudo fuser -k {port}/tcp", shell=True, check=True)
+                print(f"  🔴 Killed mock server on port {port}")
+                time.sleep(2)  # Đợi process tắt hoàn toàn
+                return True
+            except subprocess.CalledProcessError:
+                print(f"  ⚠️  No process found on port {port}")
+                return False
     
     def test_retry_fallback(self) -> List[Dict[str, Any]]:
         """Test retry/fallback logic"""
         print("\n🔄 Testing retry/fallback logic...")
         results = []
+        
+        if self.in_docker:
+            print("  ⚠️  Running in Docker - cannot kill servers automatically")
+            print("  📝 Please kill servers manually and run test again:")
+            print("     sudo fuser -k 8081/tcp")
+            print("     sudo fuser -k 8082/tcp")
+            print("     python test_routing_logic.py retry")
+            return results
         
         # Test 1: Tắt 1 server (primary)
         print("\n  Test 1: Kill primary server (8081)")
@@ -188,8 +219,12 @@ class MCCVATester:
         # Test 3: Normal routing
         normal_result = self.test_mccva_routing("Normal")
         
-        # Test 4: Retry/fallback
-        retry_results = self.test_retry_fallback()
+        # Test 4: Retry/fallback (chỉ khi không trong Docker)
+        retry_results = []
+        if not self.in_docker:
+            retry_results = self.test_retry_fallback()
+        else:
+            print("\n🔄 Skipping retry/fallback test (running in Docker)")
         
         # Test 5: Concurrent requests
         concurrent_results = self.test_concurrent_requests(5)
@@ -204,8 +239,11 @@ class MCCVATester:
         print(f"ML Service: {'✅' if ml_results['health_ok'] else '❌'}")
         print(f"Normal Routing: {'✅' if normal_result['success'] else '❌'}")
         
-        retry_success = sum(1 for r in retry_results if r['success'])
-        print(f"Retry/Fallback: {retry_success}/{len(retry_results)} successful")
+        if retry_results:
+            retry_success = sum(1 for r in retry_results if r['success'])
+            print(f"Retry/Fallback: {retry_success}/{len(retry_results)} successful")
+        else:
+            print("Retry/Fallback: Skipped (Docker mode)")
         
         concurrent_success = sum(1 for r in concurrent_results if r['success'])
         print(f"Concurrent: {concurrent_success}/{len(concurrent_results)} successful")
@@ -220,21 +258,38 @@ class MCCVATester:
 
 def main():
     """Main function"""
-    tester = MCCVATester()
+    # Parse command line arguments
+    in_docker = "--docker" in sys.argv
+    base_url = None
+    
+    # Extract base_url if provided
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith("--url="):
+            base_url = arg.split("=")[1]
+            break
+    
+    tester = MCCVATester(base_url=base_url, in_docker=in_docker)
     
     if len(sys.argv) > 1:
-        if sys.argv[1] == "health":
+        arg = sys.argv[1]
+        if arg == "health":
             tester.test_health_endpoints()
-        elif sys.argv[1] == "routing":
+        elif arg == "routing":
             tester.test_mccva_routing()
-        elif sys.argv[1] == "retry":
-            tester.test_retry_fallback()
-        elif sys.argv[1] == "concurrent":
+        elif arg == "retry":
+            if not in_docker:
+                tester.test_retry_fallback()
+            else:
+                print("❌ Retry test not available in Docker mode")
+                print("💡 Run on host or kill servers manually first")
+        elif arg == "concurrent":
             tester.test_concurrent_requests()
-        elif sys.argv[1] == "ml":
+        elif arg == "ml":
             tester.test_ml_service()
+        elif arg.startswith("--"):
+            pass  # Skip flags
         else:
-            print("Usage: python test_routing_logic.py [health|routing|retry|concurrent|ml]")
+            print("Usage: python test_routing_logic.py [health|routing|retry|concurrent|ml] [--docker] [--url=base_url]")
     else:
         # Run full test suite
         tester.run_full_test_suite()
