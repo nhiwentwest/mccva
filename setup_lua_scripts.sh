@@ -20,7 +20,7 @@ log "Copy Lua scripts..."
 cat > "$LUA_DIR/mccva_routing.lua" << 'EOF'
 #!/usr/bin/env lua
 -- mccva_routing.lua - MCCVA Algorithm Implementation
--- Triển khai thuật toán MCCVA với retry/fallback logic
+-- Triển khai thuật toán MCCVA với retry/fallback logic và improved load balancing
 
 local http = require "resty.http"
 local cjson = require "cjson.safe"
@@ -36,16 +36,16 @@ local ML_SERVICE_URL = "http://127.0.0.1:5000"
 local MAX_RETRIES = 3
 local RETRY_DELAY = 1  -- seconds
 
--- Mock server endpoints
+-- Mock server endpoints với load balancing weights
 local MOCK_SERVERS = {
-    [1] = "http://127.0.0.1:8081",
-    [2] = "http://127.0.0.1:8082", 
-    [3] = "http://127.0.0.1:8083",
-    [4] = "http://127.0.0.1:8084",
-    [5] = "http://127.0.0.1:8085",
-    [6] = "http://127.0.0.1:8086",
-    [7] = "http://127.0.0.1:8087",
-    [8] = "http://127.0.0.1:8088"
+    [1] = {url = "http://127.0.0.1:8081", weight = 3, priority = 1},
+    [2] = {url = "http://127.0.0.1:8082", weight = 2, priority = 2},
+    [3] = {url = "http://127.0.0.1:8083", weight = 3, priority = 3},
+    [4] = {url = "http://127.0.0.1:8084", weight = 2, priority = 4},
+    [5] = {url = "http://127.0.0.1:8085", weight = 3, priority = 5},
+    [6] = {url = "http://127.0.0.1:8086", weight = 2, priority = 6},
+    [7] = {url = "http://127.0.0.1:8087", weight = 3, priority = 7},
+    [8] = {url = "http://127.0.0.1:8088", weight = 2, priority = 8}
 }
 
 -- Utility functions
@@ -131,10 +131,112 @@ local function get_ml_prediction(features)
     return prediction
 end
 
+-- Improved load balancing selection
+local function select_server_with_load_balancing(makespan, priority, confidence)
+    local request_id = get_request_id()
+    
+    -- Get current server loads from shared memory
+    local server_loads = {}
+    for server_id, server_info in pairs(MOCK_SERVERS) do
+        local load_key = "load_" .. server_id
+        local current_load = mccva_stats:get(load_key) or 0
+        server_loads[server_id] = {
+            id = server_id,
+            url = server_info.url,
+            weight = server_info.weight,
+            priority = server_info.priority,
+            current_load = current_load,
+            score = 0
+        }
+    end
+    
+    -- Calculate server scores based on multiple factors
+    for server_id, server_info in pairs(server_loads) do
+        local score = 0
+        
+        -- Factor 1: Makespan-based routing (40% weight)
+        if makespan == "small" and server_id <= 2 then
+            score = score + 40
+        elseif makespan == "medium" and server_id >= 3 and server_id <= 5 then
+            score = score + 40
+        elseif makespan == "large" and server_id >= 6 then
+            score = score + 40
+        else
+            score = score + 20  -- Partial score for other cases
+        end
+        
+        -- Factor 2: Priority-based routing (30% weight)
+        if server_info.priority == priority then
+            score = score + 30
+        elseif math.abs(server_info.priority - priority) == 1 then
+            score = score + 20
+        else
+            score = score + 10
+        end
+        
+        -- Factor 3: Load balancing (20% weight)
+        local load_factor = math.max(0, 20 - (server_info.current_load * 2))
+        score = score + load_factor
+        
+        -- Factor 4: Server weight (10% weight)
+        score = score + (server_info.weight * 2)
+        
+        server_info.score = score
+    end
+    
+    -- Sort servers by score (descending)
+    local sorted_servers = {}
+    for _, server_info in pairs(server_loads) do
+        table.insert(sorted_servers, server_info)
+    end
+    table.sort(sorted_servers, function(a, b) return a.score > b.score end)
+    
+    -- Select top 3 servers and use weighted random selection
+    local candidates = {}
+    local total_weight = 0
+    
+    for i = 1, math.min(3, #sorted_servers) do
+        local server = sorted_servers[i]
+        local weight = server.weight * (1 / (1 + server.current_load * 0.1))
+        table.insert(candidates, {server = server, weight = weight})
+        total_weight = total_weight + weight
+    end
+    
+    -- Weighted random selection
+    local random_value = math.random() * total_weight
+    local current_weight = 0
+    
+    for _, candidate in ipairs(candidates) do
+        current_weight = current_weight + candidate.weight
+        if random_value <= current_weight then
+            local selected_server = candidate.server
+            
+            -- Update server load
+            local load_key = "load_" .. selected_server.id
+            local new_load = (mccva_stats:get(load_key) or 0) + 1
+            mccva_stats:set(load_key, new_load)
+            
+            log_info(string.format("[%s] Selected server %d (score: %.2f, load: %d)", 
+                                 request_id, selected_server.id, selected_server.score, new_load))
+            
+            return selected_server.id, selected_server.url
+        end
+    end
+    
+    -- Fallback to first server
+    local fallback_server = sorted_servers[1]
+    local load_key = "load_" .. fallback_server.id
+    local new_load = (mccva_stats:get(load_key) or 0) + 1
+    mccva_stats:set(load_key, new_load)
+    
+    log_info(string.format("[%s] Fallback to server %d", request_id, fallback_server.id))
+    return fallback_server.id, fallback_server.url
+end
+
 -- Route request to appropriate server
 local function route_request(server_number, request_data)
     local request_id = get_request_id()
-    local server_url = MOCK_SERVERS[server_number]
+    local server_url = MOCK_SERVERS[server_number].url
     
     if not server_url then
         log_error(string.format("[%s] Invalid server number: %d", request_id, server_number))
@@ -243,18 +345,12 @@ local function mccva_route()
         return
     end
     
-    -- Determine server based on makespan prediction
-    local server_number
-    if prediction.makespan == "small" then
-        server_number = 1
-    elseif prediction.makespan == "medium" then
-        server_number = 2
-    elseif prediction.makespan == "large" then
-        server_number = 3
-    else
-        -- Fallback based on priority
-        server_number = math.min(request_data.priority, #MOCK_SERVERS)
-    end
+    -- Select server using improved load balancing
+    local server_number, server_url = select_server_with_load_balancing(
+        prediction.makespan, 
+        request_data.priority, 
+        prediction.confidence
+    )
     
     -- Route request to selected server
     local response, err = route_request(server_number, request_data)
@@ -275,7 +371,12 @@ local function mccva_route()
         server = "server_" .. server_number,
         prediction = prediction,
         response = response,
-        request_id = request_id
+        request_id = request_id,
+        load_balancing_info = {
+            selected_server = server_number,
+            server_url = server_url,
+            selection_method = "improved_load_balancing"
+        }
     }
     
     log_info(string.format("[%s] MCCVA routing completed successfully", request_id))
