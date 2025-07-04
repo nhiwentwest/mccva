@@ -78,6 +78,9 @@ if ! command -v docker &> /dev/null; then
   sh get-docker.sh; 
   sudo usermod -aG docker $CURRENT_USER; 
   rm get-docker.sh
+  echo "\n\033[1;33m👉 Đã cài Docker và thêm user vào group docker.\033[0m"
+  echo "\033[1;33m👉 Bạn cần logout/login lại hoặc chạy 'newgrp docker' rồi chạy lại script này để tiếp tục.\033[0m"
+  exit 0
 else
   log "Docker đã được cài đặt."
 fi
