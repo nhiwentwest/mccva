@@ -162,13 +162,6 @@ if [ -f "./test_ai_routing_host.py" ]; then
     else
         warn "⚠️ AI Routing Logic Test had some issues (check output above)"
     fi
-elif [ -f "./test_ai_routing_simple.py" ]; then
-    # Run AI routing test (simple version - no matplotlib needed)
-    if python3 test_ai_routing_simple.py; then
-        log "✅ AI Routing Logic Test completed successfully"
-    else
-        warn "⚠️ AI Routing Logic Test had some issues (check output above)"
-    fi
 elif [ -f "./test_ai_routing.py" ]; then
     # Install required packages if needed
     if ! python3 -c "import matplotlib" 2>/dev/null; then
@@ -190,7 +183,6 @@ log "✅ Hệ thống đã sẵn sàng!"
 log ""
 log "🎯 Để test thêm, chạy:"
 log "   python3 test_ai_routing_host.py    # Test AI routing logic (host environment)"
-log "   python3 test_ai_routing_simple.py  # Test AI routing logic (simple version)"
 log "   python3 test_routing_logic.py      # Test retry/fallback logic"
 log "   python3 advanced_test_suite.py     # Advanced testing"
 log ""
