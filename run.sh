@@ -149,7 +149,20 @@ fi
 
 # Test AI Routing Logic với script mới
 log "🤖 Running AI Routing Logic Test..."
-if [ -f "./test_ai_routing_simple.py" ]; then
+if [ -f "./test_ai_routing_host.py" ]; then
+    # Install requests if needed
+    if ! python3 -c "import requests" 2>/dev/null; then
+        log "Installing requests library for AI routing test..."
+        pip3 install requests
+    fi
+    
+    # Run AI routing test (host environment version)
+    if python3 test_ai_routing_host.py; then
+        log "✅ AI Routing Logic Test completed successfully"
+    else
+        warn "⚠️ AI Routing Logic Test had some issues (check output above)"
+    fi
+elif [ -f "./test_ai_routing_simple.py" ]; then
     # Run AI routing test (simple version - no matplotlib needed)
     if python3 test_ai_routing_simple.py; then
         log "✅ AI Routing Logic Test completed successfully"
@@ -176,9 +189,10 @@ fi
 log "✅ Hệ thống đã sẵn sàng!"
 log ""
 log "🎯 Để test thêm, chạy:"
-log "   python3 test_ai_routing.py          # Test AI routing logic"
-log "   python3 test_routing_logic.py       # Test retry/fallback logic"
-log "   python3 advanced_test_suite.py      # Advanced testing"
+log "   python3 test_ai_routing_host.py    # Test AI routing logic (host environment)"
+log "   python3 test_ai_routing_simple.py  # Test AI routing logic (simple version)"
+log "   python3 test_routing_logic.py      # Test retry/fallback logic"
+log "   python3 advanced_test_suite.py     # Advanced testing"
 log ""
 log "📊 Để xem logs:"
 log "   sudo journalctl -f -u openresty     # OpenResty logs"
