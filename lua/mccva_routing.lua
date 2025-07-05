@@ -190,9 +190,21 @@ if ngx.req.get_method() == "POST" then
         local data = cjson.decode(body)
         
         -- Step 1: SVM Classification - Dự đoán makespan
+        local features = {
+            data.cpu_cores or 4,
+            data.memory or 8,
+            data.storage or 100,
+            data.network_bandwidth or 1000,
+            data.priority or 3
+        }
+        
+        local ml_request = {
+            features = features
+        }
+        
         local makespan_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/makespan", {
             method = "POST",
-            body = body,
+            body = cjson.encode(ml_request),
             headers = { ["Content-Type"] = "application/json" }
         })
         
