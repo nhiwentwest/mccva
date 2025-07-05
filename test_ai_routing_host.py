@@ -165,10 +165,12 @@ class HostAIRoutingTester:
             
             if response.status_code == 200:
                 result = response.json()
-                target_vm = result.get('target_vm', 'unknown')
-                mccva_decision = result.get('mccva_decision', {})
-                makespan = mccva_decision.get('makespan_prediction', 'unknown')
-                confidence = mccva_decision.get('confidence_score', 0)
+                
+                # Parse response theo format thực tế
+                target_vm = result.get('server', 'unknown')
+                prediction = result.get('prediction', {})
+                makespan = prediction.get('makespan', 'unknown')
+                confidence = prediction.get('confidence', 0)
                 
                 print(f"   ✅ OpenResty routing working:")
                 print(f"     Target VM: {target_vm}")
@@ -214,10 +216,12 @@ class HostAIRoutingTester:
                 
                 if response.status_code == 200:
                     result = response.json()
-                    mccva_decision = result.get('mccva_decision', {})
-                    makespan_prediction = mccva_decision.get('makespan_prediction', 'unknown')
-                    confidence = mccva_decision.get('confidence_score', 0)
-                    target_vm = result.get('target_vm', 'unknown')
+                    
+                    # Parse response theo format thực tế
+                    target_vm = result.get('server', 'unknown')
+                    prediction = result.get('prediction', {})
+                    makespan_prediction = prediction.get('makespan', 'unknown')
+                    confidence = prediction.get('confidence', 0)
                     
                     print(f"   ✅ AI Prediction: {makespan_prediction} (confidence: {confidence:.3f})")
                     print(f"   🎯 Target VM: {target_vm}")
@@ -278,13 +282,17 @@ class HostAIRoutingTester:
                     
                     if response.status_code == 200:
                         result = response.json()
-                        target_vm = result.get('target_vm', 'unknown')
-                        mccva_decision = result.get('mccva_decision', {})
-                        makespan = mccva_decision.get('makespan_prediction', 'unknown')
+                        
+                        # Parse response theo format thực tế
+                        target_vm = result.get('server', 'unknown')
+                        prediction = result.get('prediction', {})
+                        makespan = prediction.get('makespan', 'unknown')
                         
                         # Extract server number from target_vm
                         server_num = None
-                        if 'mock_server_' in target_vm:
+                        if 'server_' in target_vm:
+                            server_num = int(target_vm.split('_')[-1])
+                        elif 'mock_server_' in target_vm:
                             server_num = int(target_vm.split('_')[-1])
                         elif '808' in target_vm:
                             server_num = int(target_vm.split(':')[-1]) - 8080
