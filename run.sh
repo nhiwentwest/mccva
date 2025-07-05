@@ -147,4 +147,40 @@ else
     error "❌ AI routing test failed"
 fi
 
-log "✅ Hệ thống đã sẵn sàng!" 
+# Test AI Routing Logic với script mới
+log "🤖 Running AI Routing Logic Test..."
+if [ -f "./test_ai_routing_simple.py" ]; then
+    # Run AI routing test (simple version - no matplotlib needed)
+    if python3 test_ai_routing_simple.py; then
+        log "✅ AI Routing Logic Test completed successfully"
+    else
+        warn "⚠️ AI Routing Logic Test had some issues (check output above)"
+    fi
+elif [ -f "./test_ai_routing.py" ]; then
+    # Install required packages if needed
+    if ! python3 -c "import matplotlib" 2>/dev/null; then
+        log "Installing matplotlib for AI routing test..."
+        pip3 install matplotlib numpy
+    fi
+    
+    # Run AI routing test
+    if python3 test_ai_routing.py; then
+        log "✅ AI Routing Logic Test completed successfully"
+    else
+        warn "⚠️ AI Routing Logic Test had some issues (check output above)"
+    fi
+else
+    warn "⚠️ No AI routing test script found, skipping AI routing logic test"
+fi
+
+log "✅ Hệ thống đã sẵn sàng!"
+log ""
+log "🎯 Để test thêm, chạy:"
+log "   python3 test_ai_routing.py          # Test AI routing logic"
+log "   python3 test_routing_logic.py       # Test retry/fallback logic"
+log "   python3 advanced_test_suite.py      # Advanced testing"
+log ""
+log "📊 Để xem logs:"
+log "   sudo journalctl -f -u openresty     # OpenResty logs"
+log "   sudo journalctl -f -u mccva-mock-servers  # Mock servers logs"
+log "   docker logs -f mccva-ml             # ML Service logs" 

@@ -335,6 +335,247 @@ def get_models_info():
         logger.error(f"Error in get_models_info: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/predict/enhanced', methods=['POST'])
+def predict_enhanced():
+    """
+    Enhanced API với ensemble learning - kết hợp SVM và K-Means
+    Input: {"features": [cpu_cores, memory, storage, network_bandwidth, priority], "vm_features": [cpu_usage, ram_usage, storage_usage]}
+    Output: {"makespan": "small|medium|large", "cluster": int, "confidence": float, "model_contributions": {...}}
+    """
+    try:
+        if svm_model is None or kmeans_model is None or svm_scaler is None or kmeans_scaler is None:
+            return jsonify({"error": "Models not loaded"}), 503
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No request data"}), 400
+        
+        features = data.get("features", [])
+        vm_features = data.get("vm_features", [0.5, 0.5, 0.5])  # Default VM features
+        
+        # Validate features
+        if len(features) != 5:
+            return jsonify({"error": "Expected 5 features: [cpu_cores, memory, storage, network_bandwidth, priority]"}), 400
+        
+        if len(vm_features) != 3:
+            return jsonify({"error": "Expected 3 VM features: [cpu_usage, ram_usage, storage_usage]"}), 400
+        
+        # Validate ranges
+        if not (1 <= features[0] <= 16):  # cpu_cores
+            return jsonify({"error": "CPU cores must be between 1-16"}), 400
+        if not (1 <= features[1] <= 64):  # memory_gb
+            return jsonify({"error": "Memory must be between 1-64 GB"}), 400
+        if not (10 <= features[2] <= 1000):  # storage_gb
+            return jsonify({"error": "Storage must be between 10-1000 GB"}), 400
+        if not (100 <= features[3] <= 10000):  # network_bandwidth
+            return jsonify({"error": "Network bandwidth must be between 100-10000 Mbps"}), 400
+        if not (1 <= features[4] <= 5):  # priority
+            return jsonify({"error": "Priority must be between 1-5"}), 400
+        
+        # Validate VM features (0-1)
+        for i, feature in enumerate(vm_features):
+            if not (0 <= feature <= 1):
+                return jsonify({"error": f"VM feature {i} must be between 0-1 (percentage)"}), 400
+        
+        # Enhanced feature engineering
+        enhanced_features = extract_enhanced_features(features)
+        
+        # Model 1: SVM Prediction
+        features_scaled = svm_scaler.transform([features])
+        svm_prediction = svm_model.predict(features_scaled)[0]
+        svm_decision_scores = svm_model.decision_function(features_scaled)
+        svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
+        
+        # Model 2: K-Means Prediction
+        vm_scaled = kmeans_scaler.transform([vm_features])
+        kmeans_cluster = int(kmeans_model.predict(vm_scaled)[0])
+        kmeans_distances = kmeans_model.transform(vm_scaled)[0]
+        kmeans_confidence = float(1 / (1 + np.min(kmeans_distances)))  # Closer to centroid = higher confidence
+        
+        # Model 3: Rule-based Heuristic
+        rule_prediction, rule_confidence = get_rule_based_prediction(enhanced_features)
+        
+        # Ensemble Decision
+        ensemble_result = ensemble_decision(
+            svm_prediction, svm_confidence,
+            kmeans_cluster, kmeans_confidence,
+            rule_prediction, rule_confidence,
+            enhanced_features
+        )
+        
+        logger.info(f"Enhanced prediction: {ensemble_result}")
+        
+        return jsonify({
+            "makespan": ensemble_result["makespan"],
+            "cluster": ensemble_result["cluster"],
+            "confidence": ensemble_result["confidence"],
+            "model_contributions": {
+                "svm": {
+                    "prediction": svm_prediction,
+                    "confidence": svm_confidence,
+                    "weight": ensemble_result["weights"]["svm"]
+                },
+                "kmeans": {
+                    "prediction": kmeans_cluster,
+                    "confidence": kmeans_confidence,
+                    "weight": ensemble_result["weights"]["kmeans"]
+                },
+                "rule_based": {
+                    "prediction": rule_prediction,
+                    "confidence": rule_confidence,
+                    "weight": ensemble_result["weights"]["rule"]
+                }
+            },
+            "enhanced_features": enhanced_features,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in predict_enhanced: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def extract_enhanced_features(features):
+    """Extract enhanced features từ basic features"""
+    cpu_cores, memory, storage, network_bandwidth, priority = features
+    
+    enhanced = {
+        # Basic features
+        "cpu_cores": cpu_cores,
+        "memory": memory,
+        "storage": storage,
+        "network_bandwidth": network_bandwidth,
+        "priority": priority,
+        
+        # Derived features (AI insights)
+        "compute_intensity": cpu_cores / memory if memory > 0 else 0,
+        "storage_intensity": storage / memory if memory > 0 else 0,
+        "network_intensity": network_bandwidth / cpu_cores if cpu_cores > 0 else 0,
+        "resource_ratio": (cpu_cores * memory) / storage if storage > 0 else 0,
+        
+        # Workload classification
+        "is_compute_intensive": cpu_cores / memory > 0.5 if memory > 0 else False,
+        "is_memory_intensive": memory > 16,
+        "is_storage_intensive": storage > 500,
+        "is_network_intensive": network_bandwidth > 5000,
+        
+        # Priority-based features
+        "high_priority": priority >= 4,
+        "low_priority": priority <= 2,
+        "priority_weight": priority / 5.0,
+        
+        # Resource utilization patterns
+        "balanced_resources": abs(cpu_cores - memory/4) < 2,  # CPU and memory balanced
+        "storage_heavy": storage > (cpu_cores * memory * 2),
+        "network_heavy": network_bandwidth > (cpu_cores * 1000)
+    }
+    
+    return enhanced
+
+def get_rule_based_prediction(enhanced_features):
+    """Rule-based prediction dựa trên business logic"""
+    score = 0
+    confidence = 0.5  # Base confidence
+    
+    # Rule 1: Compute-intensive workloads
+    if enhanced_features["is_compute_intensive"]:
+        score += 30
+        confidence += 0.1
+    
+    # Rule 2: High priority requests
+    if enhanced_features["high_priority"]:
+        score += 25
+        confidence += 0.15
+    
+    # Rule 3: Memory-intensive workloads
+    if enhanced_features["is_memory_intensive"]:
+        score += 20
+        confidence += 0.1
+    
+    # Rule 4: Network-intensive workloads
+    if enhanced_features["is_network_intensive"]:
+        score += 15
+        confidence += 0.1
+    
+    # Rule 5: Storage-heavy workloads
+    if enhanced_features["storage_heavy"]:
+        score += 10
+        confidence += 0.05
+    
+    # Determine makespan based on score
+    if score >= 60:
+        prediction = "large"
+    elif score >= 30:
+        prediction = "medium"
+    else:
+        prediction = "small"
+    
+    confidence = min(confidence, 0.9)  # Cap confidence at 0.9
+    
+    return prediction, confidence
+
+def ensemble_decision(svm_pred, svm_conf, kmeans_cluster, kmeans_conf, rule_pred, rule_conf, enhanced_features):
+    """Ensemble decision combining all models"""
+    
+    # Dynamic weights based on confidence and model performance
+    svm_weight = svm_conf * 0.5  # SVM gets 50% max weight
+    kmeans_weight = kmeans_conf * 0.3  # K-Means gets 30% max weight
+    rule_weight = rule_conf * 0.2  # Rule-based gets 20% max weight
+    
+    # Normalize weights
+    total_weight = svm_weight + kmeans_weight + rule_weight
+    if total_weight > 0:
+        svm_weight /= total_weight
+        kmeans_weight /= total_weight
+        rule_weight /= total_weight
+    else:
+        # Fallback weights
+        svm_weight, kmeans_weight, rule_weight = 0.5, 0.3, 0.2
+    
+    # Weighted voting for makespan
+    makespan_scores = {"small": 0, "medium": 0, "large": 0}
+    
+    # SVM vote
+    makespan_scores[svm_pred] += svm_weight
+    
+    # Rule-based vote
+    makespan_scores[rule_pred] += rule_weight
+    
+    # K-Means influence (indirect)
+    if kmeans_cluster in [0, 1]:  # Low-resource clusters
+        makespan_scores["small"] += kmeans_weight * 0.5
+        makespan_scores["medium"] += kmeans_weight * 0.5
+    elif kmeans_cluster in [2, 3]:  # Medium-resource clusters
+        makespan_scores["medium"] += kmeans_weight
+    else:  # High-resource clusters
+        makespan_scores["medium"] += kmeans_weight * 0.5
+        makespan_scores["large"] += kmeans_weight * 0.5
+    
+    # Determine final makespan
+    final_makespan = max(makespan_scores, key=makespan_scores.get)
+    
+    # Calculate ensemble confidence
+    ensemble_confidence = (
+        svm_conf * svm_weight +
+        kmeans_conf * kmeans_weight +
+        rule_conf * rule_weight
+    )
+    
+    # Adjust confidence based on agreement
+    agreement_score = max(makespan_scores.values()) / sum(makespan_scores.values())
+    ensemble_confidence *= agreement_score
+    
+    return {
+        "makespan": final_makespan,
+        "cluster": kmeans_cluster,
+        "confidence": ensemble_confidence,
+        "weights": {
+            "svm": svm_weight,
+            "kmeans": kmeans_weight,
+            "rule": rule_weight
+        },
+        "agreement_score": agreement_score
+    }
+
 if __name__ == '__main__':
     # Load models khi khởi động
     load_models()
