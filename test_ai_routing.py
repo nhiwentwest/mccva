@@ -31,42 +31,108 @@ class AIRoutingTester:
         self.test_scenarios = [
             {
                 "name": "Web Server (Small)",
-                "data": {"cpu_cores": 2, "memory": 4, "storage": 50, "network_bandwidth": 500, "priority": 1},
+                "data": {
+                    "cpu_cores": 2, 
+                    "memory": 4, 
+                    "storage": 50, 
+                    "network_bandwidth": 500, 
+                    "priority": 1,
+                    "task_complexity": 1,     # Simple task
+                    "data_size": 20,          # Small data
+                    "io_intensity": 10,       # Low I/O
+                    "parallel_degree": 100,   # Low parallelism
+                    "deadline_urgency": 1     # Low urgency
+                },
                 "vm_features": [0.3, 0.4, 0.2],  # Low VM usage
                 "expected_makespan": "small",
                 "expected_servers": [1, 2, 3]  # Low capacity servers
             },
             {
                 "name": "Database Server (Medium)",
-                "data": {"cpu_cores": 4, "memory": 8, "storage": 100, "network_bandwidth": 1000, "priority": 3},
+                "data": {
+                    "cpu_cores": 4, 
+                    "memory": 8, 
+                    "storage": 100, 
+                    "network_bandwidth": 1000, 
+                    "priority": 3,
+                    "task_complexity": 2,     # Medium complexity
+                    "data_size": 50,          # Medium data
+                    "io_intensity": 25,       # Medium I/O
+                    "parallel_degree": 500,   # Medium parallelism
+                    "deadline_urgency": 2     # Medium urgency
+                },
                 "vm_features": [0.6, 0.7, 0.5],  # Medium VM usage
                 "expected_makespan": "medium", 
                 "expected_servers": [3, 4, 5, 6]  # Medium capacity servers
             },
             {
                 "name": "ML Training (Large)",
-                "data": {"cpu_cores": 12, "memory": 32, "storage": 500, "network_bandwidth": 5000, "priority": 5},
+                "data": {
+                    "cpu_cores": 12, 
+                    "memory": 32, 
+                    "storage": 500, 
+                    "network_bandwidth": 5000, 
+                    "priority": 5,
+                    "task_complexity": 4,     # High complexity
+                    "data_size": 200,         # Large data
+                    "io_intensity": 75,       # High I/O
+                    "parallel_degree": 1500,  # High parallelism
+                    "deadline_urgency": 4     # High urgency
+                },
                 "vm_features": [0.8, 0.9, 0.7],  # High VM usage
                 "expected_makespan": "large",
                 "expected_servers": [5, 6, 7, 8]  # High capacity servers
             },
             {
                 "name": "Video Rendering (Large)",
-                "data": {"cpu_cores": 16, "memory": 64, "storage": 800, "network_bandwidth": 8000, "priority": 4},
+                "data": {
+                    "cpu_cores": 16, 
+                    "memory": 64, 
+                    "storage": 800, 
+                    "network_bandwidth": 8000, 
+                    "priority": 4,
+                    "task_complexity": 5,     # Very high complexity
+                    "data_size": 500,         # Very large data
+                    "io_intensity": 90,       # Very high I/O
+                    "parallel_degree": 2000,  # Max parallelism
+                    "deadline_urgency": 5     # Max urgency
+                },
                 "vm_features": [0.9, 0.8, 0.6],  # High VM usage
                 "expected_makespan": "large",
                 "expected_servers": [5, 6, 7, 8]
             },
             {
                 "name": "API Gateway (Small)",
-                "data": {"cpu_cores": 1, "memory": 2, "storage": 20, "network_bandwidth": 2000, "priority": 2},
+                "data": {
+                    "cpu_cores": 1, 
+                    "memory": 2, 
+                    "storage": 20, 
+                    "network_bandwidth": 2000, 
+                    "priority": 2,
+                    "task_complexity": 1,     # Simple task
+                    "data_size": 10,          # Small data
+                    "io_intensity": 5,        # Very low I/O
+                    "parallel_degree": 100,   # Low parallelism
+                    "deadline_urgency": 1     # Low urgency
+                },
                 "vm_features": [0.4, 0.3, 0.1],  # Low VM usage
                 "expected_makespan": "small",
                 "expected_servers": [1, 2, 3]
             },
             {
                 "name": "File Server (Medium)",
-                "data": {"cpu_cores": 6, "memory": 12, "storage": 200, "network_bandwidth": 1500, "priority": 3},
+                "data": {
+                    "cpu_cores": 6, 
+                    "memory": 12, 
+                    "storage": 200, 
+                    "network_bandwidth": 1500, 
+                    "priority": 3,
+                    "task_complexity": 3,     # Medium-high complexity
+                    "data_size": 100,         # Medium-large data
+                    "io_intensity": 50,       # Medium-high I/O
+                    "parallel_degree": 800,   # Medium-high parallelism
+                    "deadline_urgency": 3     # Medium urgency
+                },
                 "vm_features": [0.5, 0.6, 0.8],  # Medium VM usage
                 "expected_makespan": "medium",
                 "expected_servers": [3, 4, 5, 6]
@@ -282,7 +348,12 @@ class AIRoutingTester:
             "memory": 8, 
             "storage": 100,
             "network_bandwidth": 1000,
-            "priority": 3
+            "priority": 3,
+            "task_complexity": 2,
+            "data_size": 50,
+            "io_intensity": 25,
+            "parallel_degree": 500,
+            "deadline_urgency": 2
         }
         
         server_counts = defaultdict(int)
@@ -385,7 +456,12 @@ class AIRoutingTester:
             "memory": 8,
             "storage": 100, 
             "network_bandwidth": 1000,
-            "priority": 3
+            "priority": 3,
+            "task_complexity": 2,
+            "data_size": 50,
+            "io_intensity": 25,
+            "parallel_degree": 500,
+            "deadline_urgency": 2
         }
         
         # Test AI routing
