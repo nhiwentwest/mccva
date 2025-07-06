@@ -324,7 +324,7 @@ class AIRoutingTester:
         if server_counts:
             counts = list(server_counts.values())
             mean_count = statistics.mean(counts)
-            std_count = statistics.std(counts) if len(counts) > 1 else 0
+            std_count = statistics.stdev(counts) if len(counts) > 1 else 0
             cv = (std_count / mean_count) if mean_count > 0 else 0  # Coefficient of variation
             
             print(f"\n📊 Load Balancing Results:")
