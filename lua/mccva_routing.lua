@@ -206,7 +206,7 @@ if ngx.req.get_method() == "POST" then
         }
         
         -- Dùng enhanced prediction endpoint
-        local enhanced_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/enhanced", {
+        local enhanced_response, err = http.new():request_uri("http://localhost:5000/predict/enhanced", {
             method = "POST",
             body = cjson.encode(enhanced_request),
             headers = { ["Content-Type"] = "application/json" }
@@ -231,7 +231,7 @@ if ngx.req.get_method() == "POST" then
                 features = features
             }
             
-            local makespan_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/makespan", {
+            local makespan_response, err = http.new():request_uri("http://localhost:5000/predict/makespan", {
                 method = "POST",
                 body = cjson.encode(ml_request),
                 headers = { ["Content-Type"] = "application/json" }
