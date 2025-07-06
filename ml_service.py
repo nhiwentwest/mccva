@@ -141,8 +141,8 @@ def predict_makespan():
             return jsonify({"error": "Priority must be between 1-5"}), 400
         if not (1 <= features[5] <= 5):  # task_complexity
             return jsonify({"error": "Task complexity must be between 1-5"}), 400
-        if not (1 <= features[6] <= 5):  # data_size
-            return jsonify({"error": "Data size must be between 1-5"}), 400
+        if not (1 <= features[6] <= 1000):  # data_size - changed from 1-5 to 1-1000
+            return jsonify({"error": "Data size must be between 1-1000"}), 400
         if not (1 <= features[7] <= 100):  # io_intensity
             return jsonify({"error": "IO intensity must be between 1-100"}), 400
         if not (100 <= features[8] <= 2000):  # parallel_degree
