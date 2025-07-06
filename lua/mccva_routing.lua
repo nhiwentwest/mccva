@@ -24,17 +24,17 @@ local mccva_server_mapping = {
         small = {
             primary = "http://127.0.0.1:8081",  -- VM tải thấp
             backup = "http://127.0.0.1:8082",   -- VM tải thấp backup
-            weight = 0.7  -- 70% traffic to primary
+            weight = 0.6  -- More load balancing for small tasks
         },
         medium = {
             primary = "http://127.0.0.1:8083",  -- VM tải trung bình
             backup = "http://127.0.0.1:8084",   -- VM tải trung bình backup
-            weight = 0.6  -- 60% traffic to primary
+            weight = 0.5  -- Equal distribution for medium tasks
         },
         large = {
             primary = "http://127.0.0.1:8085",  -- VM tải cao
             backup = "http://127.0.0.1:8086",   -- VM tải cao backup
-            weight = 0.8  -- 80% traffic to primary
+            weight = 0.7  -- More primary for large tasks (high capacity servers)
         }
     },
     
@@ -79,7 +79,7 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
     local routing_info = {}
     
     -- Priority 1: High confidence makespan routing (SVM-based)
-    if confidence and confidence > 2.0 then
+    if confidence and confidence > 1.0 then  -- Lower threshold from 2.0 to 1.0
         local makespan_config = mccva_server_mapping.makespan[makespan]
         if makespan_config then
             -- Weighted random selection based on SVM confidence
@@ -87,9 +87,9 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
             local adjusted_weight = makespan_config.weight
             
             -- Adjust weight based on SVM confidence
-            if confidence > 3.0 then
+            if confidence > 2.0 then
                 adjusted_weight = adjusted_weight + 0.1  -- Higher confidence = more primary
-            elseif confidence < 2.5 then
+            elseif confidence < 1.5 then
                 adjusted_weight = adjusted_weight - 0.1  -- Lower confidence = more backup
             end
             
@@ -227,9 +227,10 @@ if ngx.req.get_method() == "POST" then
             cluster = enhanced_result.cluster
             confidence = enhanced_result.confidence
             
-            -- Log enhanced prediction details
+            -- Log enhanced prediction details with more info
             ngx.log(ngx.INFO, "Enhanced prediction: makespan=" .. makespan .. 
-                   ", cluster=" .. cluster .. ", confidence=" .. confidence)
+                   ", cluster=" .. cluster .. ", confidence=" .. confidence ..
+                   ", features=" .. cjson.encode(features))
         else
             -- Fallback to basic prediction if enhanced fails
             local ml_request = {
@@ -246,11 +247,24 @@ if ngx.req.get_method() == "POST" then
                 local makespan_result = cjson.decode(makespan_response.body)
                 makespan = makespan_result.makespan
                 confidence = makespan_result.confidence
+                
+                -- Log fallback prediction
+                ngx.log(ngx.INFO, "Fallback prediction: makespan=" .. makespan .. 
+                       ", confidence=" .. confidence)
+            else
+                -- Log prediction failure
+                ngx.log(ngx.ERR, "ML prediction failed: " .. (err or "unknown error") ..
+                       ", enhanced_status=" .. (enhanced_response and enhanced_response.status or "nil"))
             end
         end
         
-        -- Step 2: MCCVA Algorithm - Chọn VM tối ưu
+        -- Step 2: MCCVA Algorithm - Chọn VM tối ưu với logging
         local target_vm, routing_info = mccva_select_vm(makespan, cluster, confidence, vm_features)
+        
+        -- Log routing decision
+        ngx.log(ngx.INFO, "MCCVA routing decision: target_vm=" .. target_vm .. 
+               ", method=" .. (routing_info.method or "unknown") ..
+               ", algorithm=" .. (routing_info.algorithm or "unknown"))
         
         -- Step 3: Forward request to selected VM with retry/fallback
         local tried_vms = {}
