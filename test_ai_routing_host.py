@@ -85,9 +85,9 @@ def test_ai_routing():
         try:
             start_time = time.time()
             
-            # Send request to OpenResty
+            # Send request to OpenResty - dùng đúng endpoint
             response = requests.post(
-                "http://localhost/routing",
+                "http://localhost/mccva/route",
                 json=case['data'],
                 headers={'Content-Type': 'application/json'},
                 timeout=10
@@ -98,9 +98,12 @@ def test_ai_routing():
             
             if response.status_code == 200:
                 result = response.json()
-                prediction = result.get('prediction', 'unknown')
+                
+                # Parse response theo format thực tế của OpenResty
+                prediction_data = result.get('prediction', {})
+                prediction = prediction_data.get('makespan', 'unknown')
                 server = result.get('server', 'unknown')
-                confidence = result.get('confidence', 0)
+                confidence = prediction_data.get('confidence', 0)
                 
                 is_correct = prediction == case['expected']
                 
@@ -135,6 +138,7 @@ def test_ai_routing():
                 
             else:
                 print(f"  ❌ HTTP Error: {response.status_code}")
+                print(f"  Response: {response.text}")
                 results["incorrect_predictions"] += 1
                 
         except requests.exceptions.RequestException as e:
