@@ -268,6 +268,31 @@ if ngx.req.get_method() == "POST" then
         end
 
         local res, err = try_forward(target_vm, "")
+        
+        -- Success case: Return response with prediction data
+        if res and res.status < 500 then
+            local response_data = cjson.decode(res.body)
+            response_data.routing_info = routing_info
+            response_data.target_vm = target_vm
+            response_data.prediction = {
+                makespan = makespan,
+                confidence = confidence,
+                features = features,
+                timestamp = os.date("%Y-%m-%dT%H:%M:%S")
+            }
+            response_data.mccva_decision = {
+                makespan_prediction = makespan,
+                cluster_prediction = cluster,
+                confidence_score = confidence,
+                algorithm_used = routing_info.algorithm,
+                ensemble_score = routing_info.ensemble_score
+            }
+            response_data.server = target_vm:gsub("http://127.0.0.1:", "server_")
+            ngx.header.content_type = "application/json"
+            ngx.say(cjson.encode(response_data))
+            return
+        end
+        
         -- Nếu lỗi, thử backup (nếu có)
         if (not res or res.status >= 500) and routing_info then
             local backup_vm = nil
