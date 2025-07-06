@@ -130,10 +130,21 @@ class AIRoutingTester:
                 
                 if response.status_code == 200:
                     result = response.json()
+                    
+                    # Parse response theo format thực tế của OpenResty
+                    prediction_data = result.get('prediction', {})
+                    makespan_prediction = prediction_data.get('makespan', 'unknown')
+                    confidence = prediction_data.get('confidence', 0)
+                    target_vm = result.get('server', 'unknown')
+                    
+                    # Check if mccva_decision exists, otherwise use prediction data
                     mccva_decision = result.get('mccva_decision', {})
-                    makespan_prediction = mccva_decision.get('makespan_prediction', 'unknown')
-                    confidence = mccva_decision.get('confidence_score', 0)
-                    target_vm = result.get('target_vm', 'unknown')
+                    if not mccva_decision:
+                        mccva_decision = {
+                            'makespan_prediction': makespan_prediction,
+                            'confidence_score': confidence,
+                            'algorithm_used': 'Enhanced Prediction'
+                        }
                     
                     print(f"   ✅ Routing Prediction: {makespan_prediction} (confidence: {confidence:.3f})")
                     print(f"   🎯 Target VM: {target_vm}")
