@@ -256,7 +256,9 @@ if ngx.req.get_method() == "POST" then
         local tried_vms = {}
         local function try_forward(vm_url, method_label)
             local client = http.new()
-            local res, err = client:request_uri(vm_url, {
+            -- Add /process endpoint for POST requests
+            local full_url = vm_url .. "/process"
+            local res, err = client:request_uri(full_url, {
                 method = "POST",
                 body = body,
                 headers = {
