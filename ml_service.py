@@ -551,9 +551,9 @@ def ensemble_decision(svm_pred, svm_conf, kmeans_cluster, kmeans_conf, rule_pred
     """Ensemble decision combining all models"""
     
     # Dynamic weights based on confidence and model performance
-    svm_weight = svm_conf * 0.5  # SVM gets 50% max weight
-    kmeans_weight = kmeans_conf * 0.3  # K-Means gets 30% max weight
-    rule_weight = rule_conf * 0.2  # Rule-based gets 20% max weight
+    svm_weight = svm_conf * 0.2  # SVM gets 20% max weight (reduced from 50%)
+    kmeans_weight = kmeans_conf * 0.2  # K-Means gets 20% max weight (reduced from 30%)
+    rule_weight = rule_conf * 0.6  # Rule-based gets 60% max weight (increased from 20%)
     
     # Normalize weights
     total_weight = svm_weight + kmeans_weight + rule_weight
