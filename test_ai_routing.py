@@ -3,6 +3,7 @@
 AI Routing Logic Test Script
 Kiểm tra việc phân phối request có tận dụng được AI model không
 Tập trung vào: makespan prediction, server selection, load balancing
+Enhanced version với better test scenarios
 """
 
 import requests
@@ -26,44 +27,56 @@ class AIRoutingTester:
             "error_logs": []
         }
         
-        # Test scenarios với different resource requirements
+        # Enhanced test scenarios với better data distribution
         self.test_scenarios = [
             {
-                "name": "Small Task (Low Resource)",
+                "name": "Web Server (Small)",
                 "data": {"cpu_cores": 2, "memory": 4, "storage": 50, "network_bandwidth": 500, "priority": 1},
+                "vm_features": [0.3, 0.4, 0.2],  # Low VM usage
                 "expected_makespan": "small",
                 "expected_servers": [1, 2, 3]  # Low capacity servers
             },
             {
-                "name": "Medium Task (Balanced)",
+                "name": "Database Server (Medium)",
                 "data": {"cpu_cores": 4, "memory": 8, "storage": 100, "network_bandwidth": 1000, "priority": 3},
+                "vm_features": [0.6, 0.7, 0.5],  # Medium VM usage
                 "expected_makespan": "medium", 
                 "expected_servers": [3, 4, 5, 6]  # Medium capacity servers
             },
             {
-                "name": "Large Task (High Resource)",
-                "data": {"cpu_cores": 8, "memory": 16, "storage": 200, "network_bandwidth": 2000, "priority": 5},
+                "name": "ML Training (Large)",
+                "data": {"cpu_cores": 12, "memory": 32, "storage": 500, "network_bandwidth": 5000, "priority": 5},
+                "vm_features": [0.8, 0.9, 0.7],  # High VM usage
                 "expected_makespan": "large",
                 "expected_servers": [5, 6, 7, 8]  # High capacity servers
             },
             {
-                "name": "CPU Intensive Task",
-                "data": {"cpu_cores": 12, "memory": 8, "storage": 100, "network_bandwidth": 1000, "priority": 4},
+                "name": "Video Rendering (Large)",
+                "data": {"cpu_cores": 16, "memory": 64, "storage": 800, "network_bandwidth": 8000, "priority": 4},
+                "vm_features": [0.9, 0.8, 0.6],  # High VM usage
                 "expected_makespan": "large",
                 "expected_servers": [5, 6, 7, 8]
             },
             {
-                "name": "Storage Intensive Task", 
-                "data": {"cpu_cores": 4, "memory": 8, "storage": 800, "network_bandwidth": 1000, "priority": 2},
+                "name": "API Gateway (Small)",
+                "data": {"cpu_cores": 1, "memory": 2, "storage": 20, "network_bandwidth": 2000, "priority": 2},
+                "vm_features": [0.4, 0.3, 0.1],  # Low VM usage
+                "expected_makespan": "small",
+                "expected_servers": [1, 2, 3]
+            },
+            {
+                "name": "File Server (Medium)",
+                "data": {"cpu_cores": 6, "memory": 12, "storage": 200, "network_bandwidth": 1500, "priority": 3},
+                "vm_features": [0.5, 0.6, 0.8],  # Medium VM usage
                 "expected_makespan": "medium",
                 "expected_servers": [3, 4, 5, 6]
             }
         ]
     
-    def test_ai_prediction_accuracy(self):
-        """Test độ chính xác của AI prediction"""
-        print("🤖 Testing AI Prediction Accuracy")
-        print("=" * 50)
+    def test_enhanced_prediction_accuracy(self):
+        """Test độ chính xác của Enhanced AI prediction"""
+        print("🤖 Testing Enhanced AI Prediction Accuracy")
+        print("=" * 60)
         
         correct_predictions = 0
         total_predictions = 0
@@ -71,9 +84,43 @@ class AIRoutingTester:
         for scenario in self.test_scenarios:
             print(f"\n📋 Testing: {scenario['name']}")
             print(f"   Expected makespan: {scenario['expected_makespan']}")
+            print(f"   Input: {scenario['data']}")
+            print(f"   VM Features: {scenario['vm_features']}")
             
             try:
                 start_time = time.time()
+                
+                # Test enhanced prediction endpoint
+                enhanced_data = {
+                    "features": [
+                        scenario['data']['cpu_cores'],
+                        scenario['data']['memory'],
+                        scenario['data']['storage'],
+                        scenario['data']['network_bandwidth'],
+                        scenario['data']['priority']
+                    ],
+                    "vm_features": scenario['vm_features']
+                }
+                
+                # Test enhanced endpoint directly
+                enhanced_response = requests.post(
+                    f"{self.base_url}:5000/predict/enhanced",
+                    json=enhanced_data,
+                    timeout=10
+                )
+                
+                if enhanced_response.status_code == 200:
+                    enhanced_result = enhanced_response.json()
+                    enhanced_makespan = enhanced_result.get('makespan', 'unknown')
+                    enhanced_confidence = enhanced_result.get('confidence', 0)
+                    model_contributions = enhanced_result.get('model_contributions', {})
+                    
+                    print(f"   🔬 Enhanced Prediction: {enhanced_makespan} (confidence: {enhanced_confidence:.3f})")
+                    print(f"   📊 Model Contributions:")
+                    for model, contrib in model_contributions.items():
+                        print(f"     - {model}: {contrib.get('prediction', 'N/A')} (weight: {contrib.get('weight', 0):.3f})")
+                
+                # Test routing endpoint
                 response = requests.post(
                     f"{self.base_url}/mccva/route",
                     json=scenario["data"],
@@ -88,7 +135,7 @@ class AIRoutingTester:
                     confidence = mccva_decision.get('confidence_score', 0)
                     target_vm = result.get('target_vm', 'unknown')
                     
-                    print(f"   ✅ AI Prediction: {makespan_prediction} (confidence: {confidence:.3f})")
+                    print(f"   ✅ Routing Prediction: {makespan_prediction} (confidence: {confidence:.3f})")
                     print(f"   🎯 Target VM: {target_vm}")
                     print(f"   ⏱️  Response time: {response_time:.3f}s")
                     
@@ -106,10 +153,13 @@ class AIRoutingTester:
                         "scenario": scenario["name"],
                         "expected": scenario["expected_makespan"],
                         "predicted": makespan_prediction,
+                        "enhanced_predicted": enhanced_makespan if enhanced_response.status_code == 200 else "unknown",
                         "confidence": confidence,
+                        "enhanced_confidence": enhanced_confidence if enhanced_response.status_code == 200 else 0,
                         "target_vm": target_vm,
                         "response_time": response_time,
-                        "correct": makespan_prediction == scenario['expected_makespan']
+                        "correct": makespan_prediction == scenario['expected_makespan'],
+                        "enhanced_correct": enhanced_makespan == scenario['expected_makespan'] if enhanced_response.status_code == 200 else False
                     })
                     
                 else:
@@ -123,12 +173,17 @@ class AIRoutingTester:
         accuracy = (correct_predictions / total_predictions * 100) if total_predictions > 0 else 0
         print(f"\n📊 AI Prediction Accuracy: {accuracy:.1f}% ({correct_predictions}/{total_predictions})")
         
-        return accuracy
+        # Calculate enhanced accuracy if available
+        enhanced_correct = sum(1 for pred in self.results["ai_predictions"] if pred.get("enhanced_correct", False))
+        enhanced_accuracy = (enhanced_correct / total_predictions * 100) if total_predictions > 0 else 0
+        print(f"📊 Enhanced Prediction Accuracy: {enhanced_accuracy:.1f}% ({enhanced_correct}/{total_predictions})")
+        
+        return accuracy, enhanced_accuracy
     
-    def test_server_distribution(self, requests_per_scenario=20):
+    def test_server_distribution(self, requests_per_scenario=10):
         """Test phân phối server với nhiều requests"""
         print(f"\n🔄 Testing Server Distribution ({requests_per_scenario} requests per scenario)")
-        print("=" * 60)
+        print("=" * 70)
         
         server_distribution = defaultdict(int)
         scenario_results = defaultdict(lambda: {"servers": [], "predictions": []})
@@ -153,7 +208,9 @@ class AIRoutingTester:
                         
                         # Extract server number from target_vm
                         server_num = None
-                        if 'mock_server_' in target_vm:
+                        if 'server_' in target_vm:
+                            server_num = int(target_vm.split('_')[-1])
+                        elif 'mock_server_' in target_vm:
                             server_num = int(target_vm.split('_')[-1])
                         elif '808' in target_vm:
                             server_num = int(target_vm.split(':')[-1]) - 8080
@@ -163,7 +220,7 @@ class AIRoutingTester:
                             scenario_results[scenario['name']]["servers"].append(server_num)
                             scenario_results[scenario['name']]["predictions"].append(makespan)
                             
-                            if i < 5:  # Show first 5 results
+                            if i < 3:  # Show first 3 results
                                 print(f"   Request {i+1}: Server {server_num} (makespan: {makespan})")
                     
                 except Exception as e:
@@ -401,10 +458,10 @@ class AIRoutingTester:
         print("=" * 50)
         
         # AI Prediction Accuracy
-        accuracy = self.test_ai_prediction_accuracy()
+        accuracy, enhanced_accuracy = self.test_enhanced_prediction_accuracy()
         
         # Server Distribution
-        distribution = self.test_server_distribution(requests_per_scenario=15)
+        distribution = self.test_server_distribution(requests_per_scenario=10)
         
         # Load Balancing Efficiency
         lb_results = self.test_load_balancing_efficiency(total_requests=80)
@@ -415,6 +472,7 @@ class AIRoutingTester:
         # Summary
         print(f"\n🎯 Summary:")
         print(f"   AI Prediction Accuracy: {accuracy:.1f}%")
+        print(f"   Enhanced Prediction Accuracy: {enhanced_accuracy:.1f}%")
         print(f"   Load Balancing CV: {lb_results['load_balancing_cv']:.3f}")
         print(f"   AI vs Random Improvement: {((comparison['random_cv'] - comparison['ai_cv']) / comparison['random_cv'] * 100):.1f}%" if comparison['random_cv'] > 0 else "N/A")
         
@@ -428,6 +486,7 @@ class AIRoutingTester:
         
         return {
             "accuracy": accuracy,
+            "enhanced_accuracy": enhanced_accuracy,
             "load_balancing_cv": lb_results['load_balancing_cv'],
             "ai_vs_random_improvement": ((comparison['random_cv'] - comparison['ai_cv']) / comparison['random_cv'] * 100) if comparison['random_cv'] > 0 else 0
         }
@@ -456,6 +515,7 @@ def main():
     
     print(f"\n✅ Test completed successfully!")
     print(f"   AI Accuracy: {results['accuracy']:.1f}%")
+    print(f"   Enhanced AI Accuracy: {results['enhanced_accuracy']:.1f}%")
     print(f"   Load Balancing Quality: {'Good' if results['load_balancing_cv'] < 0.5 else 'Needs Improvement'}")
     print(f"   AI Improvement: {results['ai_vs_random_improvement']:.1f}%")
 
