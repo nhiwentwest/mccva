@@ -78,10 +78,16 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
     local selected_vm = nil
     local routing_info = {}
     
+    -- Debug log input parameters
+    ngx.log(ngx.INFO, "MCCVA DEBUG: Input - makespan=" .. makespan .. 
+           ", cluster=" .. cluster .. ", confidence=" .. confidence)
+    
     -- Priority 1: High confidence makespan routing (SVM-based)
     if confidence and confidence > 1.0 then  -- Lower threshold from 2.0 to 1.0
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Using high confidence routing (confidence > 1.0)")
         local makespan_config = mccva_server_mapping.makespan[makespan]
         if makespan_config then
+            ngx.log(ngx.INFO, "MCCVA DEBUG: Found makespan config for " .. makespan)
             -- Weighted random selection based on SVM confidence
             local rand = math.random()
             local adjusted_weight = makespan_config.weight
@@ -103,11 +109,18 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
             routing_info.confidence = confidence
             routing_info.makespan = makespan
             routing_info.algorithm = "SVM Classification"
+            ngx.log(ngx.INFO, "MCCVA DEBUG: Selected VM via SVM - " .. selected_vm .. 
+                   ", confidence=" .. confidence)
+        else
+            ngx.log(ngx.ERR, "MCCVA DEBUG: No makespan config found for " .. makespan)
         end
+    else
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Confidence too low (" .. confidence .. "), using fallback")
     end
     
     -- Priority 2: Cluster-based routing (K-Means-based fallback)
     if not selected_vm then
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Using cluster-based routing for cluster " .. cluster)
         local cluster_config = mccva_server_mapping.cluster[cluster]
         if cluster_config then
             local rand = math.random()
@@ -139,11 +152,16 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
             routing_info.confidence = confidence or 0
             routing_info.cluster = cluster
             routing_info.algorithm = "K-Means Clustering"
+            ngx.log(ngx.INFO, "MCCVA DEBUG: Selected VM via K-Means - " .. selected_vm .. 
+                   ", confidence=" .. (confidence or 0))
+        else
+            ngx.log(ngx.ERR, "MCCVA DEBUG: No cluster config found for cluster " .. cluster)
         end
     end
     
     -- Priority 3: MCCVA ensemble decision (combine SVM + K-Means)
     if not selected_vm then
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Using ensemble decision")
         -- Use both algorithms to make final decision
         local ensemble_score = 0
         
@@ -176,7 +194,12 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
         routing_info.confidence = confidence or 0
         routing_info.ensemble_score = ensemble_score
         routing_info.algorithm = "MCCVA Ensemble (SVM + K-Means)"
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Selected VM via Ensemble - " .. selected_vm .. 
+               ", confidence=" .. (confidence or 0))
     end
+    
+    ngx.log(ngx.INFO, "MCCVA DEBUG: Final result - VM=" .. (selected_vm or "nil") .. 
+           ", confidence=" .. (routing_info.confidence or 0))
     
     return selected_vm, routing_info
 end
