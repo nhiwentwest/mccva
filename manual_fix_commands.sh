@@ -3,9 +3,6 @@
 echo "🔧 Manual Fix for Class Mapping Issue"
 echo "====================================="
 
-cat << 'EOF'
-# Run these commands directly on your cloud server:
-
 # 1. Check current class mapping in ml_service.py
 echo "Current class mapping:"
 grep -A3 "svm_class_mapping" ml_service.py
@@ -120,6 +117,4 @@ sleep 3
 
 # 10. Final test
 echo "Final accuracy test:"
-python3 test_ai_routing.py | head -50
-
-EOF 
+python3 test_ai_routing.py | head -50 
