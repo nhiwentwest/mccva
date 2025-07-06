@@ -301,8 +301,8 @@ if ngx.req.get_method() == "POST" then
                 makespan_prediction = makespan,
                 cluster_prediction = cluster,
                 confidence_score = confidence,
-                algorithm_used = routing_info.algorithm,
-                ensemble_score = routing_info.ensemble_score
+                algorithm_used = routing_info.algorithm or "unknown",
+                ensemble_score = routing_info.ensemble_score or 0
             }
             response_data.server = target_vm:gsub("http://127.0.0.1:", "server_")
             ngx.header.content_type = "application/json"
@@ -343,8 +343,8 @@ if ngx.req.get_method() == "POST" then
                         makespan_prediction = makespan,
                         cluster_prediction = cluster,
                         confidence_score = confidence,
-                        algorithm_used = routing_info.algorithm,
-                        ensemble_score = routing_info.ensemble_score
+                        algorithm_used = routing_info.algorithm or "unknown",
+                        ensemble_score = routing_info.ensemble_score or 0
                     }
                     response_data.retry = true
                     response_data.tried_vms = tried_vms
