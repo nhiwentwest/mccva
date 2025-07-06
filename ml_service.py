@@ -392,8 +392,25 @@ def predict_enhanced():
         # Enhanced feature engineering
         enhanced_features = extract_enhanced_features(features)
         
-        # Model 1: SVM Prediction
-        features_scaled = svm_scaler.transform([features])
+        # Convert 5 features to 10 features for SVM model
+        cpu_cores, memory, storage, network_bandwidth, priority = features
+        
+        # Calculate the additional 5 features needed for the 10-feature model
+        cpu_memory_ratio = cpu_cores / (memory + 1e-6)
+        storage_memory_ratio = storage / (memory + 1e-6)
+        network_cpu_ratio = network_bandwidth / (cpu_cores + 1e-6)
+        resource_intensity = (cpu_cores * memory * storage) / 1000
+        priority_weighted_cpu = cpu_cores * priority
+        
+        # Combine all 10 features for SVM model
+        svm_features = [
+            cpu_cores, memory, storage, network_bandwidth, priority,
+            cpu_memory_ratio, storage_memory_ratio, network_cpu_ratio,
+            resource_intensity, priority_weighted_cpu
+        ]
+        
+        # Model 1: SVM Prediction with 10 features
+        features_scaled = svm_scaler.transform([svm_features])
         svm_prediction = svm_model.predict(features_scaled)[0]
         svm_decision_scores = svm_model.decision_function(features_scaled)
         svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
