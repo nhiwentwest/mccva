@@ -276,7 +276,19 @@ if ngx.req.get_method() == "POST" then
         
         -- Success case: Return response with prediction data
         if res and res.status < 500 then
-            local response_data = cjson.decode(res.body)
+            local response_data = nil
+            if res.body then
+                local ok, parsed = pcall(cjson.decode, res.body)
+                if ok then
+                    response_data = parsed
+                else
+                    ngx.log(ngx.ERR, "Failed to parse response JSON: " .. (res.body or "empty"))
+                    response_data = {processed = true, error = "Invalid JSON response"}
+                end
+            else
+                response_data = {processed = true, error = "Empty response"}
+            end
+            
             response_data.routing_info = routing_info
             response_data.target_vm = target_vm
             response_data.prediction = {
@@ -312,7 +324,19 @@ if ngx.req.get_method() == "POST" then
             if backup_vm and backup_vm ~= target_vm then
                 local res2, err2 = try_forward(backup_vm, "_backup")
                 if res2 then
-                    local response_data = cjson.decode(res2.body)
+                    local response_data = nil
+                    if res2.body then
+                        local ok, parsed = pcall(cjson.decode, res2.body)
+                        if ok then
+                            response_data = parsed
+                        else
+                            ngx.log(ngx.ERR, "Failed to parse backup response JSON: " .. (res2.body or "empty"))
+                            response_data = {processed = true, error = "Invalid JSON response"}
+                        end
+                    else
+                        response_data = {processed = true, error = "Empty response"}
+                    end
+                    
                     response_data.routing_info = routing_info
                     response_data.target_vm = backup_vm
                     response_data.mccva_decision = {
