@@ -411,9 +411,13 @@ def predict_enhanced():
         
         # Model 1: SVM Prediction with 10 features
         features_scaled = svm_scaler.transform([svm_features])
-        svm_prediction = svm_model.predict(features_scaled)[0]
+        svm_prediction_int = svm_model.predict(features_scaled)[0]
         svm_decision_scores = svm_model.decision_function(features_scaled)
         svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
+        
+        # Map SVM integer prediction to string label
+        svm_class_mapping = {0: "small", 1: "medium", 2: "large"}
+        svm_prediction = svm_class_mapping.get(int(svm_prediction_int), "medium")  # Default to medium if unknown
         
         # Model 2: K-Means Prediction
         vm_scaled = kmeans_scaler.transform([vm_features])
@@ -441,6 +445,7 @@ def predict_enhanced():
             "model_contributions": {
                 "svm": {
                     "prediction": svm_prediction,
+                    "prediction_int": int(svm_prediction_int),
                     "confidence": svm_confidence,
                     "weight": ensemble_result["weights"]["svm"]
                 },
