@@ -8,20 +8,28 @@ import json
 import sys
 
 def convert_5_to_10_features(features):
-    """Convert 5 features to 10 features using same logic as ml_service.py"""
+    """Convert 5 features to 10 features matching direct SVM API format"""
     cpu_cores, memory, storage, network_bandwidth, priority = features
     
-    # Calculate derived features EXACTLY as in ml_service.py
-    cpu_memory_ratio = cpu_cores / (memory + 1e-6)
-    storage_memory_ratio = storage / (memory + 1e-6)
-    network_cpu_ratio = network_bandwidth / (cpu_cores + 1e-6)
-    resource_intensity = (cpu_cores * memory * storage) / 1000
-    priority_weighted_cpu = priority * cpu_cores
+    # Generate the missing 5 features based on realistic mappings
+    # task_complexity (1-5): based on cpu cores 
+    task_complexity = min(5, max(1, (cpu_cores // 2) + 1))
+    
+    # data_size (1-1000): based on storage
+    data_size = min(1000, max(1, storage // 10))
+    
+    # io_intensity (1-100): based on storage and network
+    io_intensity = min(100, max(1, (storage + network_bandwidth) // 100))
+    
+    # parallel_degree (100-2000): based on cpu cores and priority
+    parallel_degree = min(2000, max(100, cpu_cores * 100 + priority * 50))
+    
+    # deadline_urgency (1-5): same as priority
+    deadline_urgency = priority
     
     return [
         cpu_cores, memory, storage, network_bandwidth, priority,
-        cpu_memory_ratio, storage_memory_ratio, network_cpu_ratio,
-        resource_intensity, priority_weighted_cpu
+        task_complexity, data_size, io_intensity, parallel_degree, deadline_urgency
     ]
 
 def test_svm_direct(features_10, expected, name):
