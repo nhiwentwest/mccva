@@ -189,7 +189,7 @@ if ngx.req.get_method() == "POST" then
     if body then
         local data = cjson.decode(body)
         
-        -- Step 1: SVM Classification - Dự đoán makespan
+        -- Step 1: Enhanced AI Prediction - Dùng ensemble learning
         local features = {
             data.cpu_cores or 4,
             data.memory or 8,
@@ -198,46 +198,56 @@ if ngx.req.get_method() == "POST" then
             data.priority or 3
         }
         
-        local ml_request = {
-            features = features
+        local vm_features = data.vm_features or {0.5, 0.5, 0.5}  -- Default VM features
+        
+        local enhanced_request = {
+            features = features,
+            vm_features = vm_features
         }
         
-        local makespan_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/makespan", {
+        -- Dùng enhanced prediction endpoint
+        local enhanced_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/enhanced", {
             method = "POST",
-            body = cjson.encode(ml_request),
+            body = cjson.encode(enhanced_request),
             headers = { ["Content-Type"] = "application/json" }
         })
         
         local makespan = "medium"  -- default
+        local cluster = 0  -- default
         local confidence = 0
         
-        if makespan_response and makespan_response.status == 200 then
-            local makespan_result = cjson.decode(makespan_response.body)
-            makespan = makespan_result.makespan
-            confidence = makespan_result.confidence
-        end
-        
-        -- Step 2: K-Means Clustering - Phân cụm VM
-        local cluster = 0  -- default
-        local vm_features = data.vm_features
-        
-        if vm_features then
-            local cluster_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/vm_cluster", {
+        if enhanced_response and enhanced_response.status == 200 then
+            local enhanced_result = cjson.decode(enhanced_response.body)
+            makespan = enhanced_result.makespan
+            cluster = enhanced_result.cluster
+            confidence = enhanced_result.confidence
+            
+            -- Log enhanced prediction details
+            ngx.log(ngx.INFO, "Enhanced prediction: makespan=" .. makespan .. 
+                   ", cluster=" .. cluster .. ", confidence=" .. confidence)
+        else
+            -- Fallback to basic prediction if enhanced fails
+            local ml_request = {
+                features = features
+            }
+            
+            local makespan_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/makespan", {
                 method = "POST",
-                body = cjson.encode({vm_features = vm_features}),
+                body = cjson.encode(ml_request),
                 headers = { ["Content-Type"] = "application/json" }
             })
             
-            if cluster_response and cluster_response.status == 200 then
-                local cluster_result = cjson.decode(cluster_response.body)
-                cluster = cluster_result.cluster
+            if makespan_response and makespan_response.status == 200 then
+                local makespan_result = cjson.decode(makespan_response.body)
+                makespan = makespan_result.makespan
+                confidence = makespan_result.confidence
             end
         end
         
-        -- Step 3: MCCVA Algorithm - Chọn VM tối ưu
+        -- Step 2: MCCVA Algorithm - Chọn VM tối ưu
         local target_vm, routing_info = mccva_select_vm(makespan, cluster, confidence, vm_features)
         
-        -- Step 4: Forward request to selected VM with retry/fallback
+        -- Step 3: Forward request to selected VM with retry/fallback
         local tried_vms = {}
         local function try_forward(vm_url, method_label)
             local client = http.new()
