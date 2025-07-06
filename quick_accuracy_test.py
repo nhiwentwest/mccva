@@ -30,12 +30,24 @@ def test_svm_direct(features_10, expected, name):
         response = requests.post("http://localhost:5000/predict/makespan", 
                                json={"features": features_10}, timeout=5)
         result = response.json()
-        prediction = result["makespan"]
+        
+        # Debug: print full response if error
+        if "error" in result:
+            return None, 0, False, f"API Error: {result['error']}"
+        
+        prediction = result.get("makespan")
+        if prediction is None:
+            return None, 0, False, f"No 'makespan' in response: {result}"
+            
         confidence = result.get("confidence", 0)
         correct = (prediction == expected)
         return prediction, confidence, correct, None
+    except requests.exceptions.RequestException as e:
+        return None, 0, False, f"Request failed: {e}"
+    except json.JSONDecodeError as e:
+        return None, 0, False, f"JSON decode error: {e}"
     except Exception as e:
-        return None, 0, False, str(e)
+        return None, 0, False, f"Unexpected error: {e}"
 
 def test_enhanced_endpoint(features_5, expected, name):
     """Test enhanced endpoint with 5 features"""
