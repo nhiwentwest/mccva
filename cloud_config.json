@@ -1,0 +1,6 @@
+{
+  "host": "your-cloud-server.com",
+  "user": "ubuntu",
+  "remote_path": "/opt/mccva",
+  "ssh_key": "~/.ssh/id_rsa"
+}
