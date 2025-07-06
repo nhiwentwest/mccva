@@ -279,14 +279,21 @@ if ngx.req.get_method() == "POST" then
             local response_data = nil
             if res.body then
                 local ok, parsed = pcall(cjson.decode, res.body)
-                if ok then
+                if ok and parsed then
                     response_data = parsed
                 else
                     ngx.log(ngx.ERR, "Failed to parse response JSON: " .. (res.body or "empty"))
                     response_data = {processed = true, error = "Invalid JSON response"}
                 end
             else
+                ngx.log(ngx.ERR, "Empty response body from VM: " .. target_vm)
                 response_data = {processed = true, error = "Empty response"}
+            end
+            
+            -- Ensure response_data is never nil
+            if not response_data then
+                ngx.log(ngx.ERR, "response_data is still nil, creating fallback response")
+                response_data = {processed = true, error = "Failed to create response"}
             end
             
             response_data.routing_info = routing_info
@@ -301,8 +308,8 @@ if ngx.req.get_method() == "POST" then
                 makespan_prediction = makespan,
                 cluster_prediction = cluster,
                 confidence_score = confidence,
-                algorithm_used = routing_info.algorithm or "unknown",
-                ensemble_score = routing_info.ensemble_score or 0
+                algorithm_used = routing_info and routing_info.algorithm or "unknown",
+                ensemble_score = routing_info and routing_info.ensemble_score or 0
             }
             response_data.server = target_vm:gsub("http://127.0.0.1:", "server_")
             ngx.header.content_type = "application/json"
