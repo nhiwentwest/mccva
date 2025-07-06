@@ -205,8 +205,15 @@ if ngx.req.get_method() == "POST" then
         
         local vm_features = data.vm_features or {0.5, 0.5, 0.5}  -- Default VM features
         
+        -- Enhanced prediction uses only 5 basic features, not all 10
         local enhanced_request = {
-            features = features,
+            features = {
+                data.cpu_cores or 4,
+                data.memory or 8,
+                data.storage or 100,
+                data.network_bandwidth or 1000,
+                data.priority or 3
+            },
             vm_features = vm_features
         }
         
