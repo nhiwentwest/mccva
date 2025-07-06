@@ -166,7 +166,7 @@ def predict_makespan():
         logger.info(f"Prediction: {prediction} (confidence: {confidence:.3f}) for features: {features}")
         
         return jsonify({
-            "makespan": prediction,
+            "makespan": str(prediction),  # Convert to string for JSON serialization
             "confidence": confidence,
             "features": features,
             "timestamp": datetime.now().isoformat()
