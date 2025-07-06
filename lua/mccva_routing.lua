@@ -241,6 +241,7 @@ if ngx.req.get_method() == "POST" then
         }
         
         -- Dùng enhanced prediction endpoint
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Calling Enhanced prediction with request: " .. cjson.encode(enhanced_request))
         local enhanced_response, err = http.new():request_uri("http://localhost:5000/predict/enhanced", {
             method = "POST",
             body = cjson.encode(enhanced_request),
@@ -251,17 +252,26 @@ if ngx.req.get_method() == "POST" then
         local cluster = 0  -- default
         local confidence = 0
         
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Enhanced response status: " .. (enhanced_response and enhanced_response.status or "nil") .. 
+               ", error: " .. (err or "none"))
+        
         if enhanced_response and enhanced_response.status == 200 then
+            ngx.log(ngx.INFO, "MCCVA DEBUG: Enhanced response body: " .. (enhanced_response.body or "empty"))
             local enhanced_result = cjson.decode(enhanced_response.body)
             makespan = enhanced_result.makespan
             cluster = enhanced_result.cluster
             confidence = enhanced_result.confidence
+            
+            ngx.log(ngx.INFO, "MCCVA DEBUG: Parsed Enhanced prediction - makespan=" .. makespan .. 
+                   ", cluster=" .. cluster .. ", confidence=" .. confidence)
             
             -- Log enhanced prediction details with more info
             ngx.log(ngx.INFO, "Enhanced prediction: makespan=" .. makespan .. 
                    ", cluster=" .. cluster .. ", confidence=" .. confidence ..
                    ", features=" .. cjson.encode(features))
         else
+            ngx.log(ngx.ERR, "MCCVA DEBUG: Enhanced prediction FAILED! Status=" .. 
+                   (enhanced_response and enhanced_response.status or "nil") .. ", Error=" .. (err or "none"))
             -- Fallback to basic prediction if enhanced fails
             local ml_request = {
                 features = features
@@ -287,6 +297,9 @@ if ngx.req.get_method() == "POST" then
                        ", enhanced_status=" .. (enhanced_response and enhanced_response.status or "nil"))
             end
         end
+        
+        ngx.log(ngx.INFO, "MCCVA DEBUG: Before calling mccva_select_vm - makespan=" .. makespan .. 
+               ", cluster=" .. cluster .. ", confidence=" .. confidence)
         
         -- Step 2: MCCVA Algorithm - Chọn VM tối ưu với logging
         local target_vm, routing_info = mccva_select_vm(makespan, cluster, confidence, vm_features)
