@@ -195,7 +195,12 @@ if ngx.req.get_method() == "POST" then
             data.memory or 8,
             data.storage or 100,
             data.network_bandwidth or 1000,
-            data.priority or 3
+            data.priority or 3,
+            data.task_complexity or 2,    -- New feature: task complexity (1-5)
+            data.data_size or 50,         -- New feature: data size in GB
+            data.io_intensity or 2,       -- New feature: I/O intensity (1-5)
+            data.parallel_degree or 1,    -- New feature: parallel processing degree
+            data.deadline_urgency or 3    -- New feature: deadline urgency (1-5)
         }
         
         local vm_features = data.vm_features or {0.5, 0.5, 0.5}  -- Default VM features
