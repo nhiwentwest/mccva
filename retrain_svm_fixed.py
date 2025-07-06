@@ -13,16 +13,16 @@ import joblib
 import os
 
 def calculate_features(cpu, memory, storage, network, priority):
-    """Calculate derived features matching ml_service.py"""
-    cpu_memory_ratio = cpu / (memory + 1e-6)
-    storage_memory_ratio = storage / (memory + 1e-6)
-    network_cpu_ratio = network / (cpu + 1e-6)
-    resource_intensity = (cpu * memory * storage) / 1000
-    priority_weighted_cpu = cpu * priority
+    """Calculate 10 features matching direct SVM API format"""
+    # Generate realistic additional features based on base 5
+    task_complexity = min(5, max(1, (cpu // 2) + 1))
+    data_size = min(1000, max(1, storage // 10))
+    io_intensity = min(100, max(1, (storage + network) // 100))
+    parallel_degree = min(2000, max(100, cpu * 100 + priority * 50))
+    deadline_urgency = priority
     
     return [cpu, memory, storage, network, priority,
-            cpu_memory_ratio, storage_memory_ratio, network_cpu_ratio,
-            resource_intensity, priority_weighted_cpu]
+            task_complexity, data_size, io_intensity, parallel_degree, deadline_urgency]
 
 def create_realistic_training_data():
     """Create training data based on actual test scenario ranges"""
@@ -82,8 +82,7 @@ def create_realistic_training_data():
     
     # Convert to DataFrame
     columns = ['cpu_cores', 'memory', 'storage', 'network_bandwidth', 'priority',
-               'cpu_memory_ratio', 'storage_memory_ratio', 'network_cpu_ratio', 
-               'resource_intensity', 'priority_weighted_cpu', 'makespan']
+               'task_complexity', 'data_size', 'io_intensity', 'parallel_degree', 'deadline_urgency', 'makespan']
     
     df = pd.DataFrame(training_data, columns=columns)
     return df
@@ -97,8 +96,7 @@ def train_fixed_svm():
     
     # Prepare features and labels
     feature_columns = ['cpu_cores', 'memory', 'storage', 'network_bandwidth', 'priority',
-                      'cpu_memory_ratio', 'storage_memory_ratio', 'network_cpu_ratio', 
-                      'resource_intensity', 'priority_weighted_cpu']
+                      'task_complexity', 'data_size', 'io_intensity', 'parallel_degree', 'deadline_urgency']
     
     X = df[feature_columns].values
     y = df['makespan'].values
