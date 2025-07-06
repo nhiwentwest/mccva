@@ -78,16 +78,10 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
     local selected_vm = nil
     local routing_info = {}
     
-    -- Debug log input parameters
-    ngx.log(ngx.INFO, "MCCVA DEBUG: Input - makespan=" .. makespan .. 
-           ", cluster=" .. cluster .. ", confidence=" .. confidence)
-    
     -- Priority 1: High confidence makespan routing (SVM-based)
     if confidence and confidence > 1.0 then  -- Lower threshold from 2.0 to 1.0
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Using high confidence routing (confidence > 1.0)")
         local makespan_config = mccva_server_mapping.makespan[makespan]
         if makespan_config then
-            ngx.log(ngx.INFO, "MCCVA DEBUG: Found makespan config for " .. makespan)
             -- Weighted random selection based on SVM confidence
             local rand = math.random()
             local adjusted_weight = makespan_config.weight
@@ -109,18 +103,11 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
             routing_info.confidence = confidence
             routing_info.makespan = makespan
             routing_info.algorithm = "SVM Classification"
-            ngx.log(ngx.INFO, "MCCVA DEBUG: Selected VM via SVM - " .. selected_vm .. 
-                   ", confidence=" .. confidence)
-        else
-            ngx.log(ngx.ERR, "MCCVA DEBUG: No makespan config found for " .. makespan)
         end
-    else
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Confidence too low (" .. confidence .. "), using fallback")
     end
     
     -- Priority 2: Cluster-based routing (K-Means-based fallback)
     if not selected_vm then
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Using cluster-based routing for cluster " .. cluster)
         local cluster_config = mccva_server_mapping.cluster[cluster]
         if cluster_config then
             local rand = math.random()
@@ -152,16 +139,11 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
             routing_info.confidence = confidence or 0
             routing_info.cluster = cluster
             routing_info.algorithm = "K-Means Clustering"
-            ngx.log(ngx.INFO, "MCCVA DEBUG: Selected VM via K-Means - " .. selected_vm .. 
-                   ", confidence=" .. (confidence or 0))
-        else
-            ngx.log(ngx.ERR, "MCCVA DEBUG: No cluster config found for cluster " .. cluster)
         end
     end
     
     -- Priority 3: MCCVA ensemble decision (combine SVM + K-Means)
     if not selected_vm then
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Using ensemble decision")
         -- Use both algorithms to make final decision
         local ensemble_score = 0
         
@@ -194,12 +176,7 @@ local function mccva_select_vm(makespan, cluster, confidence, vm_features)
         routing_info.confidence = confidence or 0
         routing_info.ensemble_score = ensemble_score
         routing_info.algorithm = "MCCVA Ensemble (SVM + K-Means)"
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Selected VM via Ensemble - " .. selected_vm .. 
-               ", confidence=" .. (confidence or 0))
     end
-    
-    ngx.log(ngx.INFO, "MCCVA DEBUG: Final result - VM=" .. (selected_vm or "nil") .. 
-           ", confidence=" .. (routing_info.confidence or 0))
     
     return selected_vm, routing_info
 end
@@ -241,7 +218,6 @@ if ngx.req.get_method() == "POST" then
         }
         
         -- Dùng enhanced prediction endpoint
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Calling Enhanced prediction with request: " .. cjson.encode(enhanced_request))
         local enhanced_response, err = http.new():request_uri("http://127.0.0.1:5000/predict/enhanced", {
             method = "POST",
             body = cjson.encode(enhanced_request),
@@ -252,26 +228,12 @@ if ngx.req.get_method() == "POST" then
         local cluster = 0  -- default
         local confidence = 0
         
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Enhanced response status: " .. (enhanced_response and enhanced_response.status or "nil") .. 
-               ", error: " .. (err or "none"))
-        
         if enhanced_response and enhanced_response.status == 200 then
-            ngx.log(ngx.INFO, "MCCVA DEBUG: Enhanced response body: " .. (enhanced_response.body or "empty"))
             local enhanced_result = cjson.decode(enhanced_response.body)
             makespan = enhanced_result.makespan
             cluster = enhanced_result.cluster
             confidence = enhanced_result.confidence
-            
-            ngx.log(ngx.INFO, "MCCVA DEBUG: Parsed Enhanced prediction - makespan=" .. makespan .. 
-                   ", cluster=" .. cluster .. ", confidence=" .. confidence)
-            
-            -- Log enhanced prediction details with more info
-            ngx.log(ngx.INFO, "Enhanced prediction: makespan=" .. makespan .. 
-                   ", cluster=" .. cluster .. ", confidence=" .. confidence ..
-                   ", features=" .. cjson.encode(features))
         else
-            ngx.log(ngx.ERR, "MCCVA DEBUG: Enhanced prediction FAILED! Status=" .. 
-                   (enhanced_response and enhanced_response.status or "nil") .. ", Error=" .. (err or "none"))
             -- Fallback to basic prediction if enhanced fails
             local ml_request = {
                 features = features
@@ -287,27 +249,11 @@ if ngx.req.get_method() == "POST" then
                 local makespan_result = cjson.decode(makespan_response.body)
                 makespan = makespan_result.makespan
                 confidence = makespan_result.confidence
-                
-                -- Log fallback prediction
-                ngx.log(ngx.INFO, "Fallback prediction: makespan=" .. makespan .. 
-                       ", confidence=" .. confidence)
-            else
-                -- Log prediction failure
-                ngx.log(ngx.ERR, "ML prediction failed: " .. (err or "unknown error") ..
-                       ", enhanced_status=" .. (enhanced_response and enhanced_response.status or "nil"))
             end
         end
         
-        ngx.log(ngx.INFO, "MCCVA DEBUG: Before calling mccva_select_vm - makespan=" .. makespan .. 
-               ", cluster=" .. cluster .. ", confidence=" .. confidence)
-        
-        -- Step 2: MCCVA Algorithm - Chọn VM tối ưu với logging
+        -- Step 2: MCCVA Algorithm - Chọn VM tối ưu
         local target_vm, routing_info = mccva_select_vm(makespan, cluster, confidence, vm_features)
-        
-        -- Log routing decision
-        ngx.log(ngx.INFO, "MCCVA routing decision: target_vm=" .. target_vm .. 
-               ", method=" .. (routing_info.method or "unknown") ..
-               ", algorithm=" .. (routing_info.algorithm or "unknown"))
         
         -- Step 3: Forward request to selected VM with retry/fallback
         local tried_vms = {}
@@ -341,17 +287,14 @@ if ngx.req.get_method() == "POST" then
                 if ok and parsed then
                     response_data = parsed
                 else
-                    ngx.log(ngx.ERR, "Failed to parse response JSON: " .. (res.body or "empty"))
                     response_data = {processed = true, error = "Invalid JSON response"}
                 end
             else
-                ngx.log(ngx.ERR, "Empty response body from VM: " .. target_vm)
                 response_data = {processed = true, error = "Empty response"}
             end
             
             -- Ensure response_data is never nil
             if not response_data then
-                ngx.log(ngx.ERR, "response_data is still nil, creating fallback response")
                 response_data = {processed = true, error = "Failed to create response"}
             end
             
@@ -396,7 +339,6 @@ if ngx.req.get_method() == "POST" then
                         if ok then
                             response_data = parsed
                         else
-                            ngx.log(ngx.ERR, "Failed to parse backup response JSON: " .. (res2.body or "empty"))
                             response_data = {processed = true, error = "Invalid JSON response"}
                         end
                     else
