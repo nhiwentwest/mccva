@@ -416,7 +416,7 @@ def predict_enhanced():
         svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
         
         # Map SVM integer prediction to string label
-        svm_class_mapping = {0: "small", 1: "medium", 2: "large"}
+        svm_class_mapping = {0: "large", 1: "medium", 2: "small"}
         svm_prediction = svm_class_mapping.get(int(svm_prediction_int), "medium")  # Default to medium if unknown
         
         # Model 2: K-Means Prediction
