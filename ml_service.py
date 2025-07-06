@@ -415,9 +415,17 @@ def predict_enhanced():
         svm_decision_scores = svm_model.decision_function(features_scaled)
         svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
         
-        # Map SVM integer prediction to string label
-        svm_class_mapping = {0: "small", 1: "medium", 2: "large"}
-        svm_prediction = svm_class_mapping.get(int(svm_prediction_int), "medium")  # Default to medium if unknown
+        # Map SVM integer prediction to string label (EXACT as training)
+        # Training mapping: {'large': 0, 'medium': 1, 'small': 2}
+        # Load label encoder for correct mapping
+        try:
+            import joblib
+            label_encoder = joblib.load('models/label_encoder.joblib')
+            svm_prediction = label_encoder.inverse_transform([int(svm_prediction_int)])[0]
+        except:
+            # Fallback mapping based on training: {large: 0, medium: 1, small: 2}
+            svm_class_mapping = {0: "large", 1: "medium", 2: "small"}
+            svm_prediction = svm_class_mapping.get(int(svm_prediction_int), "medium")
         
         # Model 2: K-Means Prediction
         vm_scaled = kmeans_scaler.transform([vm_features])
