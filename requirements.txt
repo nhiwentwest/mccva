@@ -13,6 +13,9 @@ Werkzeug==3.0.1
 matplotlib==3.8.2
 seaborn==0.13.0
 
+# Excel file support for training
+openpyxl==3.1.2
+
 # Additional dependencies for Ubuntu
 gunicorn==21.2.0
 requests==2.31.0
