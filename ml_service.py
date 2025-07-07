@@ -56,11 +56,11 @@ def load_models():
         logger.info(f"SVM Model: {svm_model.kernel} kernel, {sum(svm_model.n_support_)} support vectors")
         logger.info(f"K-Means Model: {kmeans_model.n_clusters} clusters")
         
-        # Test prediction để đảm bảo models hoạt động - DISABLED due to feature mismatch
-        # test_features = [4, 8, 100, 1000, 3, 1, 2, 50, 500, 2]  # Updated to 10 features
+        # Test prediction để đảm bảo models hoạt động - UPDATED for 10 features
+        # test_features = [1, 5, 0.5, 2, 2.0, 100, 50, 150, 0.24, 0.48]  # 10 features matching new model
         # test_vm_features = [0.5, 0.5, 0.5]
         
-        # # Test SVM
+        # # Test SVM with new features
         # test_scaled = svm_scaler.transform([test_features])
         # svm_pred = svm_model.predict(test_scaled)[0]
         # logger.info(f"SVM Test prediction: {svm_pred}")
@@ -70,7 +70,7 @@ def load_models():
         # cluster_pred = kmeans_model.predict(vm_scaled)[0]
         # logger.info(f"K-Means Test prediction: Cluster {cluster_pred}")
         
-        logger.info("✅ Models loaded successfully - skipping test predictions")
+        logger.info("✅ Models loaded successfully - test predictions disabled for safety")
         
     except FileNotFoundError as e:
         logger.error(f"❌ Model file not found: {e}")
