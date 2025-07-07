@@ -5,7 +5,7 @@
 ### 📋 Tổng quan
 Sau khi train model thành công local, bạn cần:
 1. Upload project lên cloud server
-2. Khởi động Flask API service  
+2. Khởi động ML Service  
 3. Test model với script có sẵn
 
 ---
@@ -17,7 +17,8 @@ Sau khi train model thành công local, bạn cần:
 # Trên cloud server
 cd /opt/
 sudo git clone https://github.com/YOUR_USERNAME/mccva.git
-cd mccva
+sudo mv mccva /opt/mccva
+cd /opt/mccva
 ```
 
 ### Option B: Direct Upload
@@ -50,15 +51,14 @@ pip install -r requirements.txt
 
 ## 🚀 Bước 3: Khởi động ML Service
 
-### Option A: Flask Development Server
+### Option A: Development Server với ml_service.py
 ```bash
 # Activate venv
+cd /opt/mccva
 source venv/bin/activate
 
-# Run Flask app
-python3 app.py
-# hoặc
-FLASK_APP=app.py flask run --host=0.0.0.0 --port=5000
+# Run ML Service
+python3 ml_service.py
 ```
 
 ### Option B: Production với Gunicorn
@@ -67,11 +67,12 @@ FLASK_APP=app.py flask run --host=0.0.0.0 --port=5000
 pip install gunicorn
 
 # Run with gunicorn
-gunicorn --bind 0.0.0.0:5000 --workers 4 app:app
+gunicorn --bind 0.0.0.0:5000 --workers 4 ml_service:app
 ```
 
 ### Option C: Docker (Recommended for Production)
 ```bash
+# Update Dockerfile để chạy ml_service.py
 # Build và chạy với Docker
 docker-compose up --build -d
 
@@ -82,7 +83,7 @@ docker run -d -p 5000:5000 --name mccva-api mccva-svm
 
 ---
 
-## 🧪 Bước 4: Test Deployed Model
+## 🧪 Bước 4: Test Deployed ML Service
 
 ### Quick Test từ Local Machine
 ```bash
@@ -97,26 +98,38 @@ python3 test_cloud_deployment.py ec2-xx-xx-xx-xx.compute-1.amazonaws.com
 ### Test trực tiếp trên Cloud Server
 ```bash
 # Test local trên cloud server
+cd /opt/mccva
 python3 test_cloud_deployment.py localhost
 ```
 
 ### Manual API Test với curl
-```bash
-# Health check
-curl http://YOUR_CLOUD_IP:5000/health
 
-# Test prediction
-curl -X POST http://YOUR_CLOUD_IP:5000/predict \
+#### Health Check
+```bash
+curl http://YOUR_CLOUD_IP:5000/health
+```
+
+#### Test SVM Prediction
+```bash
+curl -X POST http://YOUR_CLOUD_IP:5000/predict/makespan \
   -H "Content-Type: application/json" \
   -d '{
-    "cpu_cores": 8,
-    "memory_mb": 8192, 
-    "jobs_1min": 45,
-    "jobs_5min": 180,
-    "network_receive": 2000,
-    "network_transmit": 1500,
-    "cpu_speed": 3.6
+    "features": [8, 8, 80, 3500, 4, 4, 450, 35, 800, 4]
   }'
+```
+
+#### Test K-Means Clustering
+```bash
+curl -X POST http://YOUR_CLOUD_IP:5000/predict/vm_cluster \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vm_features": [0.6, 0.7, 0.5]
+  }'
+```
+
+#### Get Models Info
+```bash
+curl http://YOUR_CLOUD_IP:5000/models/info
 ```
 
 ---
@@ -126,17 +139,18 @@ curl -X POST http://YOUR_CLOUD_IP:5000/predict \
 ### Expected Test Results
 Script `test_cloud_deployment.py` sẽ chạy 5 scenarios:
 
-| Scenario | Expected | Features |
-|----------|----------|----------|
-| Light Web Request | `small` | 2 cores, 512MB RAM |
-| Medium API Call | `medium` | 4 cores, 2GB RAM |
-| Heavy Processing | `large` | 8 cores, 8GB RAM |
+| Scenario | Expected | Features Description |
+|----------|----------|---------------------|
+| Light Web Request | `small` | 2 cores, 0.5GB RAM, low network |
+| Medium API Call | `medium` | 4 cores, 2GB RAM, medium load |
+| Heavy Processing | `large` | 8 cores, 8GB RAM, high network |
 | High CPU Only | `large` | 12 cores, 1GB RAM |
 | High Memory Only | `large` | 2 cores, 16GB RAM |
 
 ### Success Criteria
-- ✅ Health check: 200 OK
-- ✅ All 5 predictions: Correct class
+- ✅ Health check: 200 OK với SVM + K-Means loaded
+- ✅ All 5 SVM predictions: Correct class
+- ✅ K-Means clustering: Working
 - ✅ Average response time: < 1000ms
 - ✅ API reliability: 100%
 
@@ -147,18 +161,24 @@ Script `test_cloud_deployment.py` sẽ chạy 5 scenarios:
 ### Problem: Model files not found
 ```bash
 # Check if models directory exists
-ls -la models/
+ls -la /opt/mccva/models/
 
-# Nếu không có, clone lại hoặc upload models/
+# Should see:
+# svm_model.joblib, svm_scaler.joblib, svm_label_encoder.joblib
+# kmeans_model.joblib, kmeans_scaler.joblib, etc.
 ```
 
-### Problem: Flask app not starting
+### Problem: ML Service not starting
 ```bash
 # Check Python version
 python3 --version  # Needs 3.8+
 
 # Check dependencies
 pip list | grep -E "(flask|joblib|sklearn|numpy|pandas)"
+
+# Test model loading
+cd /opt/mccva
+python3 -c "import joblib; print(joblib.load('models/svm_model.joblib'))"
 
 # Check port availability
 sudo netstat -tlnp | grep :5000
@@ -194,6 +214,13 @@ server {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    
+    location /predict/ {
+        proxy_pass http://127.0.0.1:5000/predict/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 }
 ```
@@ -202,7 +229,7 @@ server {
 ```ini
 # /etc/systemd/system/mccva.service
 [Unit]
-Description=MCCVA SVM API
+Description=MCCVA ML Service
 After=network.target
 
 [Service]
@@ -210,7 +237,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/opt/mccva
 Environment=PATH=/opt/mccva/venv/bin
-ExecStart=/opt/mccva/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 4 app:app
+ExecStart=/opt/mccva/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 4 ml_service:app
 Restart=always
 
 [Install]
@@ -230,24 +257,18 @@ sudo systemctl status mccva
 
 ### Sample Lua Code
 ```lua
--- /opt/mccva/lua/svm_predict.lua
+-- /opt/mccva/lua/ml_predict.lua
 local http = require "resty.http"
 local cjson = require "cjson"
 
-local function classify_request(cpu_cores, memory_mb, jobs_1min, jobs_5min, network_receive, network_transmit, cpu_speed)
+local function svm_classify_request(features)
     local httpc = http.new()
     
     local request_data = {
-        cpu_cores = cpu_cores,
-        memory_mb = memory_mb,
-        jobs_1min = jobs_1min,
-        jobs_5min = jobs_5min,
-        network_receive = network_receive,
-        network_transmit = network_transmit,
-        cpu_speed = cpu_speed
+        features = features  -- Array of 10 features
     }
     
-    local res, err = httpc:request_uri("http://127.0.0.1:5000/predict", {
+    local res, err = httpc:request_uri("http://127.0.0.1:5000/predict/makespan", {
         method = "POST",
         body = cjson.encode(request_data),
         headers = {
@@ -261,26 +282,89 @@ local function classify_request(cpu_cores, memory_mb, jobs_1min, jobs_5min, netw
     end
     
     local result = cjson.decode(res.body)
-    return result.prediction or "medium"
+    return result.makespan or "medium"
 end
 
--- Export function
+local function kmeans_cluster_vm(vm_features)
+    local httpc = http.new()
+    
+    local request_data = {
+        vm_features = vm_features  -- [cpu_usage, ram_usage, storage_usage]
+    }
+    
+    local res, err = httpc:request_uri("http://127.0.0.1:5000/predict/vm_cluster", {
+        method = "POST",
+        body = cjson.encode(request_data),
+        headers = {
+            ["Content-Type"] = "application/json"
+        }
+    })
+    
+    if not res then
+        ngx.log(ngx.ERR, "Failed to call K-Means API: ", err)
+        return 0  -- fallback cluster
+    end
+    
+    local result = cjson.decode(res.body)
+    return result.cluster or 0
+end
+
+-- Export functions
 return {
-    classify_request = classify_request
+    svm_classify_request = svm_classify_request,
+    kmeans_cluster_vm = kmeans_cluster_vm
 }
+```
+
+### Example Usage in OpenResty
+```lua
+-- In your OpenResty config
+local ml = require "ml_predict"
+
+-- Example: Classify incoming request
+local features = {8, 8, 80, 3500, 4, 4, 450, 35, 800, 4}
+local classification = ml.svm_classify_request(features)
+ngx.log(ngx.INFO, "Request classified as: " .. classification)
+
+-- Example: Get VM cluster
+local vm_usage = {0.6, 0.7, 0.5}  -- cpu, ram, storage usage
+local cluster = ml.kmeans_cluster_vm(vm_usage)
+ngx.log(ngx.INFO, "VM assigned to cluster: " .. cluster)
 ```
 
 ---
 
 ## ✅ Success Checklist
 
-- [ ] Models uploaded to `models/` directory
-- [ ] Flask app running on port 5000
-- [ ] Health check returns 200 OK
-- [ ] Test script passes all 5 scenarios
+- [ ] Project cloned to `/opt/mccva`
+- [ ] Models uploaded to `/opt/mccva/models/` directory
+- [ ] ML Service (ml_service.py) running on port 5000
+- [ ] Health check returns 200 OK với models loaded
+- [ ] Test script passes all 5 SVM scenarios
+- [ ] K-Means clustering working
 - [ ] Average response time < 1000ms
 - [ ] Production setup (systemd/docker) configured
 - [ ] Firewall/security configured
-- [ ] OpenResty integration tested
+- [ ] OpenResty Lua integration tested
 
-**🎉 Khi tất cả checklist xong → Model ready for production!** 
+**🎉 Khi tất cả checklist xong → ML Service ready for production!**
+
+---
+
+## 🎯 Quick Commands Summary
+
+```bash
+# Clone and setup
+cd /opt/ && sudo git clone https://github.com/YOUR_USERNAME/mccva.git
+sudo mv mccva /opt/mccva && cd /opt/mccva
+python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+
+# Start ML Service
+python3 ml_service.py
+
+# Test from another terminal
+python3 test_cloud_deployment.py localhost
+
+# Production start
+gunicorn --bind 0.0.0.0:5000 --workers 4 ml_service:app
+``` 
