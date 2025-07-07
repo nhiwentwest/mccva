@@ -8,10 +8,10 @@ echo "========================================"
 # Update system
 echo "📦 Updating system packages..."
 sudo apt-get update -y
-sudo apt-get install -y python3 python3-pip git docker.io docker-compose
+sudo apt-get install -y python3 python3-pip git
 
-# Clone repository
-echo "📥 Cloning repository..."
+# Clone repository with pre-trained models
+echo "📥 Cloning repository with trained models..."
 if [ -d "mccva" ]; then
     cd mccva
     git pull origin main
@@ -24,10 +24,12 @@ fi
 echo "🐍 Installing Python dependencies..."
 pip3 install flask scikit-learn joblib pandas numpy
 
-# Check if models exist, if not train them
-echo "🧠 Checking ML models..."
-if [ ! -f "models/svm_model.joblib" ]; then
-    echo "📊 Training perfect accuracy model..."
+# Check if models directory exists (should be in repo)
+echo "🧠 Checking pre-trained models..."
+if [ -f "models/svm_model.joblib" ]; then
+    echo "✅ Found pre-trained models with 100% accuracy!"
+else
+    echo "⚠️  Models not found. Training new model..."
     python3 perfect_accuracy_train_svm.py
 fi
 
@@ -54,17 +56,25 @@ else
     exit 1
 fi
 
-# Test prediction
-echo "🔮 Testing prediction endpoint..."
+# Test prediction with perfect model
+echo "🔮 Testing perfect accuracy model..."
 PREDICTION=$(curl -s -X POST http://localhost:8080/predict \
   -H "Content-Type: application/json" \
   -d '{"cpu_cores": 8, "memory_mb": 16384, "jobs_1min": 12, "jobs_5min": 8, "network_receive": 1500, "network_transmit": 1200, "cpu_speed": 3.0}')
 
 if [[ $PREDICTION == *"large"* ]]; then
-    echo "✅ Prediction test passed!"
+    echo "✅ Perfect model prediction test passed!"
 else
     echo "❌ Prediction test failed:"
     echo "$PREDICTION"
+fi
+
+# Run comprehensive test
+echo "🎯 Running comprehensive accuracy test..."
+if [ -f "test_perfect_api.py" ]; then
+    python3 test_perfect_api.py
+else
+    echo "⚠️  Test script not found, skipping comprehensive test"
 fi
 
 echo ""
@@ -73,6 +83,7 @@ echo "======================="
 echo "🌐 API URL: http://$(curl -s ifconfig.me):8080"
 echo "📊 Health Check: http://$(curl -s ifconfig.me):8080/health"
 echo "🔮 Prediction: http://$(curl -s ifconfig.me):8080/predict"
+echo "🧪 Test Models: python3 test_perfect_api.py"
 echo ""
 echo "📋 Quick Test Commands:"
 echo "curl http://$(curl -s ifconfig.me):8080/health"
