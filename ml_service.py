@@ -32,10 +32,11 @@ svm_model = None
 kmeans_model = None
 svm_scaler = None
 kmeans_scaler = None
+svm_label_encoder = None
 
 def load_models():
     """Load các mô hình khi khởi động service"""
-    global svm_model, kmeans_model, svm_scaler, kmeans_scaler
+    global svm_model, kmeans_model, svm_scaler, kmeans_scaler, svm_label_encoder
     
     try:
         # Đảm bảo working directory đúng
@@ -44,7 +45,8 @@ def load_models():
         
         logger.info("Đang load mô hình SVM...")
         svm_model = joblib.load("models/svm_model.joblib")
-        svm_scaler = joblib.load("models/scaler.joblib")
+        svm_scaler = joblib.load("models/svm_scaler.joblib")
+        svm_label_encoder = joblib.load("models/svm_label_encoder.joblib")
         
         logger.info("Đang load mô hình K-Means...")
         kmeans_model = joblib.load("models/kmeans_model.joblib")
@@ -87,7 +89,8 @@ def health_check():
             "svm": svm_model is not None,
             "kmeans": kmeans_model is not None,
             "svm_scaler": svm_scaler is not None,
-            "kmeans_scaler": kmeans_scaler is not None
+            "kmeans_scaler": kmeans_scaler is not None,
+            "svm_label_encoder": svm_label_encoder is not None
         }
         
         all_models_loaded = all(models_status.values())
@@ -115,8 +118,8 @@ def predict_makespan():
     Output: {"makespan": "small|medium|large", "confidence": float}
     """
     try:
-        if svm_model is None or svm_scaler is None:
-            return jsonify({"error": "SVM model not loaded"}), 503
+        if svm_model is None or svm_scaler is None or svm_label_encoder is None:
+            return jsonify({"error": "SVM model components not loaded"}), 503
         
         data = request.get_json()
         if not data or "features" not in data:
@@ -154,7 +157,10 @@ def predict_makespan():
         features_scaled = svm_scaler.transform([features])
         
         # Dự đoán
-        prediction = svm_model.predict(features_scaled)[0]
+        prediction_numeric = svm_model.predict(features_scaled)[0]
+        
+        # Decode prediction từ số về tên class
+        prediction = svm_label_encoder.inverse_transform([prediction_numeric])[0]
         
         # Tính confidence score
         decision_scores = svm_model.decision_function(features_scaled)
