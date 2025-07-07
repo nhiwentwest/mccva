@@ -32,28 +32,35 @@ def test_svm_prediction(base_url, test_features):
         return False, {"error": str(e)}
 
 def convert_server_specs_to_features(server_specs):
-    """Convert server specs to 10 features for ml_service.py"""
+    """Convert server specs to 10 features that match the ACTUAL trained model"""
     cpu_cores = server_specs.get('cpu_cores', 2)
-    memory_gb = server_specs.get('memory_mb', 4000) / 1024  # Convert MB to GB
+    memory_mb = server_specs.get('memory_mb', 4000)
     jobs_1min = server_specs.get('jobs_1min', 1)
     jobs_5min = server_specs.get('jobs_5min', 5)
     network_receive = server_specs.get('network_receive', 1000)
     network_transmit = server_specs.get('network_transmit', 1000)
     cpu_speed = server_specs.get('cpu_speed', 2.5)
     
-    # Generate 10 features for ml_service.py
-    # [cpu_cores, memory_gb, storage_gb, network_bandwidth, priority, task_complexity, data_size, io_intensity, parallel_degree, deadline_urgency]
+    # EXACT FEATURES from actual trained model:
+    # ['jobs_1min', 'jobs_5min', 'memory_gb', 'cpu_cores', 'cpu_speed', 
+    #  'network_receive', 'network_transmit', 'network_total', 'resource_density', 'workload_intensity']
+    
+    memory_gb = memory_mb / 1024
+    network_total = network_receive + network_transmit
+    resource_density = memory_gb / (cpu_cores + 0.1)  # Avoid division by zero
+    workload_intensity = jobs_1min / (cpu_cores + 0.1)
+    
     features = [
-        cpu_cores,                                          # cpu_cores
-        memory_gb,                                         # memory_gb  
-        min(max(memory_gb * 10, 10), 1000),              # storage_gb (estimated)
-        network_receive + network_transmit,                # network_bandwidth
-        min(max(int(cpu_cores / 2), 1), 5),              # priority (estimated)
-        min(max(int((jobs_1min + jobs_5min) / 5), 1), 5), # task_complexity
-        min(max(jobs_1min * 10, 1), 1000),               # data_size
-        min(max(int(network_receive / 100), 1), 100),     # io_intensity
-        min(max(int(cpu_cores * cpu_speed * 100), 100), 2000), # parallel_degree
-        min(max(int(jobs_1min / 10), 1), 5)              # deadline_urgency
+        jobs_1min,           # jobs_1min
+        jobs_5min,           # jobs_5min  
+        memory_gb,           # memory_gb
+        cpu_cores,           # cpu_cores
+        cpu_speed,           # cpu_speed
+        network_receive,     # network_receive
+        network_transmit,    # network_transmit
+        network_total,       # network_total
+        resource_density,    # resource_density
+        workload_intensity   # workload_intensity
     ]
     
     return features

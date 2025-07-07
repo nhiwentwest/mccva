@@ -129,29 +129,29 @@ def predict_makespan():
         
         # Validate input
         if len(features) != 10:
-            return jsonify({"error": "Expected 10 features: [cpu_cores, memory_gb, storage_gb, network_bandwidth, priority, task_complexity, data_size, io_intensity, parallel_degree, deadline_urgency]"}), 400
+            return jsonify({"error": "Expected 10 features: [jobs_1min, jobs_5min, memory_gb, cpu_cores, cpu_speed, network_receive, network_transmit, network_total, resource_density, workload_intensity]"}), 400
         
-        # Validate ranges (updated for 10 features)
-        if not (1 <= features[0] <= 16):  # cpu_cores
+        # Validate ranges (updated for ACTUAL trained features)
+        if not (0 <= features[0] <= 100):  # jobs_1min
+            return jsonify({"error": "Jobs per 1 minute must be between 0-100"}), 400
+        if not (0 <= features[1] <= 500):  # jobs_5min
+            return jsonify({"error": "Jobs per 5 minutes must be between 0-500"}), 400
+        if not (0.1 <= features[2] <= 64):  # memory_gb
+            return jsonify({"error": "Memory must be between 0.1-64 GB"}), 400
+        if not (1 <= features[3] <= 16):  # cpu_cores
             return jsonify({"error": "CPU cores must be between 1-16"}), 400
-        if not (1 <= features[1] <= 64):  # memory_gb
-            return jsonify({"error": "Memory must be between 1-64 GB"}), 400
-        if not (10 <= features[2] <= 1000):  # storage_gb
-            return jsonify({"error": "Storage must be between 10-1000 GB"}), 400
-        if not (100 <= features[3] <= 10000):  # network_bandwidth
-            return jsonify({"error": "Network bandwidth must be between 100-10000 Mbps"}), 400
-        if not (1 <= features[4] <= 5):  # priority
-            return jsonify({"error": "Priority must be between 1-5"}), 400
-        if not (1 <= features[5] <= 5):  # task_complexity
-            return jsonify({"error": "Task complexity must be between 1-5"}), 400
-        if not (1 <= features[6] <= 1000):  # data_size - changed from 1-5 to 1-1000
-            return jsonify({"error": "Data size must be between 1-1000"}), 400
-        if not (1 <= features[7] <= 100):  # io_intensity
-            return jsonify({"error": "IO intensity must be between 1-100"}), 400
-        if not (100 <= features[8] <= 2000):  # parallel_degree
-            return jsonify({"error": "Parallel degree must be between 100-2000"}), 400
-        if not (1 <= features[9] <= 5):  # deadline_urgency
-            return jsonify({"error": "Deadline urgency must be between 1-5"}), 400
+        if not (1.0 <= features[4] <= 5.0):  # cpu_speed
+            return jsonify({"error": "CPU speed must be between 1.0-5.0 GHz"}), 400
+        if not (0 <= features[5] <= 10000):  # network_receive
+            return jsonify({"error": "Network receive must be between 0-10000 Kbps"}), 400
+        if not (0 <= features[6] <= 10000):  # network_transmit
+            return jsonify({"error": "Network transmit must be between 0-10000 Kbps"}), 400
+        if not (0 <= features[7] <= 20000):  # network_total
+            return jsonify({"error": "Network total must be between 0-20000 Kbps"}), 400
+        if not (0.01 <= features[8] <= 64):  # resource_density
+            return jsonify({"error": "Resource density must be between 0.01-64"}), 400
+        if not (0.01 <= features[9] <= 100):  # workload_intensity
+            return jsonify({"error": "Workload intensity must be between 0.01-100"}), 400
         
         # Chuẩn hóa dữ liệu
         features_scaled = svm_scaler.transform([features])
