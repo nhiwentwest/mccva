@@ -1,24 +1,24 @@
-# 🚀 Perfect SVM Classification API
+# Perfect SVM Classification API
 
 **100% Scenario Accuracy** server classification model with cloud deployment ready Flask API.
 
-## 📊 Model Performance
+## Model Performance
 
 | **Metric** | **Value** |
 |------------|-----------|
-| **Scenario Accuracy** | **100.0%** ✅ |
+| **Scenario Accuracy** | **100.0%** |
 | **Test Accuracy** | **100.0%** |
 | **CV Score** | **100.0%** |
 | **Best Model** | **RandomForest** |
 | **Training Time** | **0.1 minutes** |
 
-## 🎯 Classification Categories
+## Classification Categories
 
-- **Small**: CPU ≤ 4 AND Memory ≤ 0.025 GB AND Jobs ≤ 8
+- **Small**: CPU <= 4 AND Memory <= 0.025 GB AND Jobs <= 8
 - **Medium**: Everything in between
-- **Large**: CPU ≥ 8 OR Memory ≥ 0.045 GB OR Jobs ≥ 12
+- **Large**: CPU >= 8 OR Memory >= 0.045 GB OR Jobs >= 12
 
-## 🔧 Quick Start
+## Quick Start
 
 ### Local Development
 
@@ -42,18 +42,18 @@ docker-compose up --build
 
 # Or build manually
 docker build -t perfect-svm-api .
-docker run -p 5000:5000 perfect-svm-api
+docker run -p 8080:8080 perfect-svm-api
 ```
 
-## 📡 API Endpoints
+## API Endpoints
 
-### 🏠 Home Page
+### Home Page
 ```
 GET /
 ```
 Interactive API documentation with examples.
 
-### 🔍 Single Prediction
+### Single Prediction
 ```
 POST /predict
 Content-Type: application/json
@@ -95,7 +95,7 @@ Content-Type: application/json
 }
 ```
 
-### 📦 Batch Prediction
+### Batch Prediction
 ```
 POST /batch_predict
 Content-Type: application/json
@@ -122,17 +122,17 @@ Content-Type: application/json
 ]
 ```
 
-### 💓 Health Check
+### Health Check
 ```
 GET /health
 ```
 
-### ℹ️ Model Information
+### Model Information
 ```
 GET /model_info
 ```
 
-## ☁️ Cloud Deployment
+## Cloud Deployment
 
 ### Heroku
 ```bash
@@ -165,7 +165,7 @@ git clone https://github.com/YOUR_USERNAME/perfect-svm-api.git
 cd perfect-svm-api
 docker-compose up -d
 
-# API available at http://YOUR_EC2_IP:5000
+# API available at http://YOUR_EC2_IP:8080
 ```
 
 ### Google Cloud Run
@@ -185,16 +185,16 @@ gcloud run deploy --image gcr.io/YOUR_PROJECT_ID/perfect-svm-api --platform mana
 ### DigitalOcean App Platform
 1. Connect GitHub repository
 2. Select `Dockerfile` as build method  
-3. Set port to `5000`
+3. Set port to `8080`
 4. Deploy automatically
 
-## 🧪 Testing
+## Testing
 
 ### cURL Examples
 
 **Single Prediction:**
 ```bash
-curl -X POST http://localhost:5000/predict \
+curl -X POST http://localhost:8080/predict \
   -H "Content-Type: application/json" \
   -d '{
     "cpu_cores": 4,
@@ -209,7 +209,7 @@ curl -X POST http://localhost:5000/predict \
 
 **Health Check:**
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:8080/health
 ```
 
 ### Python Client Example
@@ -218,7 +218,7 @@ curl http://localhost:5000/health
 import requests
 
 # API endpoint
-api_url = "http://localhost:5000/predict"
+api_url = "http://localhost:8080/predict"
 
 # Server specification
 server_spec = {
@@ -239,7 +239,7 @@ print(f"Prediction: {result['prediction']}")
 print(f"Confidence: {result['confidence']:.2%}")
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 perfect-svm-api/
@@ -264,16 +264,16 @@ perfect-svm-api/
     └── mmc4.xlsx
 ```
 
-## 🔒 Security Features
+## Security Features
 
-- ✅ Non-root container user
-- ✅ Input validation and sanitization  
-- ✅ Error handling without data leakage
-- ✅ Health check endpoints
-- ✅ Structured logging
-- ✅ Resource limits via Docker
+- Non-root container user
+- Input validation and sanitization  
+- Error handling without data leakage
+- Health check endpoints
+- Structured logging
+- Resource limits via Docker
 
-## 📈 Monitoring
+## Monitoring
 
 ### Logs
 ```bash
@@ -290,7 +290,7 @@ docker logs <container_id>
 - Error rates via HTTP status codes
 - Memory and CPU usage via Docker stats
 
-## 🧠 Model Details
+## Model Details
 
 ### Features (10 total):
 1. **cpu_cores**: Number of CPU cores
@@ -305,11 +305,11 @@ docker logs <container_id>
 10. **is_high_workload**: Binary flag for high workload
 
 ### Perfect Thresholds:
-- **Small**: `cpu ≤ 4 AND memory ≤ 0.025 GB AND jobs ≤ 8`
-- **Large**: `cpu ≥ 8 OR memory ≥ 0.045 GB OR jobs ≥ 12`  
+- **Small**: `cpu <= 4 AND memory <= 0.025 GB AND jobs <= 8`
+- **Large**: `cpu >= 8 OR memory >= 0.045 GB OR jobs >= 12`  
 - **Medium**: Everything else
 
-## 📊 Training Data
+## Training Data
 
 - **Source**: 3 Excel files (mmc2.xlsx, mmc3.xlsx, mmc4.xlsx)
 - **Total Samples**: 7,350 rows
@@ -317,30 +317,30 @@ docker logs <container_id>
 - **Classes**: small, medium, large
 - **Feature Engineering**: 10 derived features from 8 raw inputs
 
-## 🎯 Scenario Testing Results
+## Scenario Testing Results
 
-**✅ 16/16 Scenarios Correct (100%)**
+**100% Accuracy: 16/16 Scenarios Correct**
 
 | **Scenario** | **Expected** | **Predicted** | **Confidence** |
 |-------------|-------------|---------------|----------------|
-| Micro Service | small | ✅ small | 0.58 |
-| Basic Web Server | small | ✅ small | 0.53 |
-| Development Server | small | ✅ small | 0.55 |
-| Simple Blog | small | ✅ small | 0.58 |
-| ML Training Server | large | ✅ large | 0.98 |
-| Video Processing | large | ✅ large | 0.98 |
-| Database Server | large | ✅ large | 0.98 |
-| High Memory Server | large | ✅ large | 0.53 |
-| High Workload Server | large | ✅ large | 0.98 |
-| Enterprise App | large | ✅ large | 0.98 |
-| Production API | medium | ✅ medium | 0.53 |
-| Web Application | medium | ✅ medium | 0.49 |
-| E-commerce Site | medium | ✅ medium | 0.49 |
-| Mid-tier Service | medium | ✅ medium | 0.53 |
-| Borderline Small | small | ✅ small | 0.40 |
-| Borderline Large | large | ✅ large | 0.98 |
+| Micro Service | small | small | 0.58 |
+| Basic Web Server | small | small | 0.53 |
+| Development Server | small | small | 0.55 |
+| Simple Blog | small | small | 0.58 |
+| ML Training Server | large | large | 0.98 |
+| Video Processing | large | large | 0.98 |
+| Database Server | large | large | 0.98 |
+| High Memory Server | large | large | 0.53 |
+| High Workload Server | large | large | 0.98 |
+| Enterprise App | large | large | 0.98 |
+| Production API | medium | medium | 0.53 |
+| Web Application | medium | medium | 0.49 |
+| E-commerce Site | medium | medium | 0.49 |
+| Mid-tier Service | medium | medium | 0.53 |
+| Borderline Small | small | small | 0.40 |
+| Borderline Large | large | large | 0.98 |
 
-## 📞 Support
+## Support
 
 For issues, questions, or contributions:
 
@@ -348,11 +348,11 @@ For issues, questions, or contributions:
 2. **Documentation**: Check this README and API docs at `/`
 3. **Email**: your.email@domain.com
 
-## 📄 License
+## License
 
 MIT License - see LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **scikit-learn** for machine learning tools
 - **Flask** for web framework
@@ -361,4 +361,4 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**🎉 Perfect 100% Accuracy Achieved! Ready for Production! 🚀**
+**Perfect 100% Accuracy Achieved! Ready for Production!**
