@@ -19,32 +19,76 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual Environment
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
+.venv/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Logs
 *.log
 logs/
+log/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# Docker
+.dockerignore
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Database
+*.db
+*.sqlite3
 
 # Temporary files
 *.tmp
 *.temp
+tmp/
+temp/
 
-# Data files (if too large)
-# data/
+# Model artifacts (if regenerated)
+# models/*.joblib  # Uncomment if models are regenerated frequently
 
-# Model files (if too large)
-# models/*.joblib 
+# Data files (uncomment if datasets are large)
+# dataset/*.xlsx
+# dataset/*.csv
+
+# Test results
+test_results/
+coverage/
+.coverage
+.pytest_cache/
+
+# Backup files
+*.bak
+*.backup
+
+# Local deployment files
+docker-compose.override.yml
+.env.docker 
