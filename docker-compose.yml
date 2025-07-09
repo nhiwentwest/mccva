@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  perfect-svm-api:
+  mccva-ml-service:
     build: .
     ports:
       - "5000:5000"
@@ -9,8 +9,10 @@ services:
       - HOST=0.0.0.0
       - PORT=5000
       - DEBUG=false
+      - PYTHONPATH=/app
     volumes:
       - ./models:/app/models:ro
+      - ./logs:/var/log/mccva
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
