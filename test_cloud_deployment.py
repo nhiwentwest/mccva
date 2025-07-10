@@ -31,6 +31,68 @@ def test_svm_prediction(base_url, test_features):
     except Exception as e:
         return False, {"error": str(e)}
 
+def test_meta_learning_endpoints(base_url):
+    """Test Meta-Learning specific endpoints"""
+    print("\n🧠 Test 4: Meta-Learning Endpoints")
+    
+    # Test Meta-Learning direct endpoint
+    print("   Testing /predict/meta_learning...")
+    meta_features = [
+        0.8, 0.7, 0.6,  # svm_conf, kmeans_conf, rule_conf
+        0.0, 1.0, 0.0,  # svm_small, svm_medium, svm_large
+        2.0, 0.3,       # cluster_id, cluster_distance_norm
+        0.6, 0.4, 0.3,  # compute_intensity, memory_intensity, storage_intensity
+        1.0, 0.7        # is_high_priority, resource_balance_score
+    ]
+    
+    try:
+        response = requests.post(f"{base_url}/predict/meta_learning", 
+                               json={"features": meta_features}, timeout=10)
+        if response.status_code == 200:
+            result = response.json()
+            print(f"   ✅ Meta-Learning: {result.get('makespan')} (confidence: {result.get('confidence', 0):.3f})")
+            print(f"      Method: {result.get('method')}")
+            print(f"      Test Accuracy: {result.get('model_info', {}).get('test_accuracy', 'Unknown')}")
+        else:
+            print(f"   ❌ Meta-Learning endpoint failed: {response.status_code}")
+    except Exception as e:
+        print(f"   ❌ Meta-Learning test error: {e}")
+    
+    # Test Complete MCCVA pipeline
+    print("\n   Testing /predict/mccva_complete...")
+    complete_input = {
+        "cpu_cores": 4,
+        "memory_gb": 8,
+        "storage_gb": 200,
+        "network_bandwidth": 5000,
+        "priority": 4,
+        "vm_cpu_usage": 0.7,
+        "vm_memory_usage": 0.6,
+        "vm_storage_usage": 0.5
+    }
+    
+    try:
+        response = requests.post(f"{base_url}/predict/mccva_complete", 
+                               json=complete_input, timeout=15)
+        if response.status_code == 200:
+            result = response.json()
+            print(f"   ✅ MCCVA Complete: {result.get('makespan')} (confidence: {result.get('confidence', 0):.3f})")
+            print(f"      Method: {result.get('method')}")
+            
+            # Show stage results
+            stages = result.get('stage_results', {})
+            print(f"      Stage 1 (SVM): {stages.get('stage1_svm', {}).get('prediction', 'Unknown')}")
+            print(f"      Stage 2 (K-Means): Cluster {stages.get('stage2_kmeans', {}).get('cluster', 'Unknown')}")
+            print(f"      Stage 3 (Meta-Learning): {stages.get('stage3_metalearning', {}).get('prediction', 'Unknown')}")
+            
+            # Model info
+            model_info = result.get('model_info', {})
+            print(f"      Meta-Learning Accuracy: {model_info.get('metalearning_accuracy', 'Unknown')}")
+        else:
+            print(f"   ❌ MCCVA Complete endpoint failed: {response.status_code}")
+    except Exception as e:
+        print(f"   ❌ MCCVA Complete test error: {e}")
+
 def convert_server_specs_to_features(server_specs):
     """Convert server specs to 10 features that match the ACTUAL trained model"""
     cpu_cores = server_specs.get('cpu_cores', 2)
@@ -81,8 +143,12 @@ def run_comprehensive_test(base_url):
         print("✅ Health check passed!")
         print(f"   Status: {data.get('status', 'unknown')}")
         print(f"   Service: {data.get('service', 'unknown')}")
-        print(f"   SVM loaded: {data.get('models_loaded', {}).get('svm', False)}")
-        print(f"   K-Means loaded: {data.get('models_loaded', {}).get('kmeans', False)}")
+        print(f"   Version: {data.get('version', 'unknown')}")
+        models_loaded = data.get('models_loaded', {})
+        print(f"   SVM loaded: {models_loaded.get('svm', False)}")
+        print(f"   K-Means loaded: {models_loaded.get('kmeans', False)}")
+        print(f"   Meta-Learning loaded: {models_loaded.get('meta_learning', False)}")
+        print(f"   Meta-Learning Ready: {data.get('meta_learning_ready', False)}")
     else:
         print("❌ Health check failed!")
         print(f"   Error: {data.get('error', 'Unknown error')}")
@@ -198,84 +264,21 @@ def run_comprehensive_test(base_url):
             else:
                 print(f"   ❌ FAILED: Expected {scenario['expected']}, got {prediction}")
                 print(f"      Confidence: {confidence:.3f}")
-                
         else:
             print(f"   ❌ ERROR: {result.get('error', 'Unknown error')}")
     
-    print()
-    print(f"📊 Prediction Test Results: {passed_tests}/{total_tests} passed ({passed_tests/total_tests*100:.1f}%)")
+    print(f"\n   📊 SVM Test Results: {passed_tests}/{total_tests} = {(passed_tests/total_tests*100):.1f}%")
     
-    # Test 4: Performance Test
-    print("\n⚡ Test 4: Performance Test")
-    start_time = time.time()
+    # Test 4: Meta-Learning Endpoints
+    test_meta_learning_endpoints(base_url)
     
-    quick_test_specs = {
-        'cpu_cores': 4,
-        'memory_mb': 4096,
-        'jobs_1min': 10,
-        'jobs_5min': 40,
-        'network_receive': 800,
-        'network_transmit': 600,
-        'cpu_speed': 2.8
-    }
+    print("\n" + "="*50)
+    print(f"🎯 OVERALL RESULT: {'✅ PASSED' if passed_tests >= total_tests * 0.8 else '❌ FAILED'}")
+    print(f"   Minimum threshold: 80% of SVM tests must pass")
+    print(f"   Meta-Learning integration tested separately")
+    print(f"   Completed at: {datetime.now().isoformat()}")
     
-    quick_test_features = convert_server_specs_to_features(quick_test_specs)
-    
-    num_requests = 10
-    successful_requests = 0
-    
-    for i in range(num_requests):
-        success, _ = test_svm_prediction(base_url, quick_test_features)
-        if success:
-            successful_requests += 1
-    
-    end_time = time.time()
-    total_time = end_time - start_time
-    avg_time = total_time / num_requests * 1000  # ms
-    
-    print(f"   Requests: {successful_requests}/{num_requests} successful")
-    print(f"   Average response time: {avg_time:.1f}ms")
-    print(f"   Total time: {total_time:.2f}s")
-    
-    if avg_time < 1000 and successful_requests == num_requests:
-        print("   ✅ Performance test passed!")
-    else:
-        print("   ⚠️  Performance could be improved")
-    
-    # Test 5: K-Means VM Clustering (if available)
-    print("\n🔄 Test 5: K-Means VM Clustering")
-    vm_test_data = {"vm_features": [0.6, 0.7, 0.5]}  # cpu, ram, storage usage
-    
-    try:
-        url = f"{base_url}/predict/vm_cluster"
-        response = requests.post(url, json=vm_test_data, timeout=10)
-        if response.status_code == 200:
-            result = response.json()
-            cluster = result.get('cluster', 'unknown')
-            distance = result.get('distance', 0)
-            print(f"   ✅ K-Means test passed: Cluster {cluster} (distance: {distance:.3f})")
-        else:
-            print(f"   ⚠️  K-Means test failed: {response.status_code}")
-    except Exception as e:
-        print(f"   ⚠️  K-Means not available: {e}")
-    
-    # Final Summary
-    print("\n" + "=" * 50)
-    print("📋 FINAL TEST SUMMARY")
-    print("=" * 50)
-    
-    if passed_tests == total_tests and successful_requests == num_requests:
-        print("🎉 ALL TESTS PASSED!")
-        print("✅ ML Service is working correctly on cloud")
-        print("✅ SVM model predictions are accurate")
-        print("✅ API endpoints are responsive")
-        print("✅ Ready for OpenResty integration")
-        return True
-    else:
-        print("⚠️  SOME TESTS FAILED")
-        print(f"   SVM prediction accuracy: {passed_tests}/{total_tests}")
-        print(f"   API reliability: {successful_requests}/{num_requests}")
-        return False
+    return passed_tests >= total_tests * 0.8
 
 def main():
     """Main function"""

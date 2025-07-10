@@ -19,76 +19,57 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual Environment
+# Virtual environments
 venv/
-env/
 ENV/
-env.bak/
-venv.bak/
-.venv/
+env/
+.env
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Logs
 *.log
 logs/
-log/
-
-# Environment variables
-.env
-.env.local
-.env.production
-.env.staging
-
-# Docker
-.dockerignore
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Database
-*.db
-*.sqlite3
+/var/log/
 
 # Temporary files
 *.tmp
 *.temp
-tmp/
-temp/
+.cache/
 
-# Model artifacts (if regenerated)
-# models/*.joblib  # Uncomment if models are regenerated frequently
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Data files (uncomment if datasets are large)
-# dataset/*.xlsx
-# dataset/*.csv
+# pyenv
+.python-version
 
-# Test results
-test_results/
-coverage/
-.coverage
-.pytest_cache/
+# pipenv
+Pipfile.lock
 
-# Backup files
-*.bak
-*.backup
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Local deployment files
-docker-compose.override.yml
-.env.docker 
+# Local test files
+test_*.json
+*.csv
+data/raw/
+data/temp/
+
+# Model artifacts (optional - keep essential models only)
+# models/old_*
+# models/backup_* 
