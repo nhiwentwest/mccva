@@ -235,7 +235,13 @@ def load_models():
         logger.info(f"SVM Model: {svm_model.kernel} kernel, {sum(svm_model.n_support_)} support vectors")
         logger.info(f"K-Means Model: {kmeans_model.n_clusters} clusters")
         logger.info(f"Meta-Learning Model: {meta_learning_info.get('architecture', 'Unknown')} architecture")
-        logger.info(f"Meta-Learning Accuracy: {meta_learning_info.get('test_accuracy', 'Unknown'):.3f}")
+        
+        # Safe formatting for test_accuracy (might be string or number)
+        accuracy = meta_learning_info.get('test_accuracy', 'Unknown')
+        if isinstance(accuracy, (int, float)):
+            logger.info(f"Meta-Learning Accuracy: {accuracy:.3f}")
+        else:
+            logger.info(f"Meta-Learning Accuracy: {accuracy}")
         
         # Update Meta-Learning Ensemble with loaded models
         meta_ensemble.meta_model = meta_learning_model
