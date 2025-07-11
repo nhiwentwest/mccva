@@ -1479,8 +1479,24 @@ def predict_mccva_complete():
         svm_decision_scores = svm_model.decision_function(svm_features_scaled)
         svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
         
-        # STAGE 2: K-Means Prediction
-        vm_features = [vm_cpu_usage, vm_memory_usage, vm_storage_usage]
+        # STAGE 2: K-Means Prediction - FIXED: Use 5 features as trained
+        # K-Means was trained with 5 features: [memory_utilization, cpu_utilization, storage_utilization, network_utilization, workload_intensity]
+        avg_job_rate = (jobs_1min + jobs_5min + jobs_1min) / 3  # Estimate job rate
+        max_job_rate_estimate = 100  # Reasonable max for normalization
+        workload_intensity_norm = min(avg_job_rate / max_job_rate_estimate, 1.0)
+        
+        # Estimate network utilization from bandwidth and priority
+        network_utilization = min(network_bandwidth / 10000.0, 1.0)  # Normalize to 0-1
+        
+        vm_features = [
+            vm_memory_usage,      # memory_utilization (0-1)
+            vm_cpu_usage,         # cpu_utilization (0-1) 
+            vm_storage_usage,     # storage_utilization (0-1)
+            network_utilization,  # network_utilization (0-1)
+            workload_intensity_norm  # workload_intensity (0-1)
+        ]
+        
+        # K-Means Prediction
         vm_features_scaled = kmeans_scaler.transform([vm_features])
         kmeans_cluster = int(kmeans_model.predict(vm_features_scaled)[0])
         kmeans_distances = kmeans_model.transform(vm_features_scaled)[0]
