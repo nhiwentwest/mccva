@@ -1,0 +1,28 @@
+{
+  "balanced_accuracy": 0.6605490794949485,
+  "timestamp": "20250711_145402",
+  "feature_names": [
+    "Jobs_per_ 1Minute",
+    "Jobs_per_ 5 Minutes",
+    "Jobs_per_ 15Minutes",
+    "Mem capacity",
+    "Disk_capacity_GB",
+    "Num_of_CPU_Cores",
+    "CPU_speed_per_Core",
+    "Avg_Recieve_Kbps",
+    "Avg_Transmit_Kbps"
+  ],
+  "best_params": {
+    "C": 10,
+    "gamma": 0.1,
+    "kernel": "rbf"
+  },
+  "classes": [
+    "large",
+    "medium",
+    "small"
+  ],
+  "version": "3.0-compatible",
+  "class_system": "3-class (small/medium/large)",
+  "compatible_with": "ml_service.py"
+}

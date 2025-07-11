@@ -259,81 +259,110 @@ def load_datasets_from_local():
     
     return combined_df
 
+def map_to_three_classes(y_original):
+    """
+    Map 5-class system to 3-class system for ML service compatibility
+    ['Very Low', 'Low'] -> 'small'
+    ['Medium'] -> 'medium' 
+    ['High', 'Very High'] -> 'large'
+    
+    Note: Dataset has quoted class names like "'Very Low'" so we need to handle that
+    """
+    class_mapping = {
+        "'Very Low'": 'small',
+        "'Low'": 'small', 
+        "'Medium'": 'medium',
+        "'High'": 'large',
+        "'Very High'": 'large',
+        # Also handle versions without quotes in case they exist
+        'Very Low': 'small',
+        'Low': 'small',
+        'Medium': 'medium', 
+        'High': 'large',
+        'Very High': 'large'
+    }
+    
+    y_mapped = [class_mapping.get(cls, 'medium') for cls in y_original]
+    return np.array(y_mapped)
+
 def prepare_balanced_svm_data(df):
-    """Prepare and clean data for SVM training"""
-    print("\n=== DATA PREPARATION ===")
-    print(f"Input data shape: {df.shape}")
+    """Prepare SVM training data với balanced sampling approach"""
+    print(f"\n=== DATA PREPARATION ===")
     
-    # Remove duplicates
-    initial_count = len(df)
-    df = df.drop_duplicates()
-    print(f"Removed {initial_count - len(df):,} duplicate rows")
+    # Remove rows with missing values in critical columns  
+    critical_columns = ['Class_Name']  # Use actual column name
+    df_clean = df.dropna(subset=critical_columns)
+    print(f"After removing missing values: {len(df_clean):,} samples")
     
-    # Required columns based on actual dataset structure
-    required_columns = [
-        'Jobs_per_ 1Minute', 'Jobs_per_ 5 Minutes', 'Jobs_per_ 15Minutes',
-        'Mem capacity', 'Disk_capacity_GB', 'Num_of_CPU_Cores', 'CPU_speed_per_Core',
-        'Avg_Recieve_Kbps', 'Avg_Transmit_Kbps', 'Class_Name'
-    ]
-    
-    df_clean = df.dropna(subset=required_columns)
-    print(f"Removed {len(df) - len(df_clean):,} rows with missing values")
-    print(f"Final clean data shape: {df_clean.shape}")
-    
-    # Create features based on actual dataset columns
+    # Use actual column names from dataset
     feature_columns = [
         'Jobs_per_ 1Minute', 'Jobs_per_ 5 Minutes', 'Jobs_per_ 15Minutes',
         'Mem capacity', 'Disk_capacity_GB', 'Num_of_CPU_Cores', 'CPU_speed_per_Core',
         'Avg_Recieve_Kbps', 'Avg_Transmit_Kbps'
     ]
     
-    # Add derived features
-    df_clean['total_jobs'] = (
-        df_clean['Jobs_per_ 1Minute'] + 
-        df_clean['Jobs_per_ 5 Minutes'] + 
-        df_clean['Jobs_per_ 15Minutes']
-    ) / 3  # Average jobs rate
+    # Check if all required columns exist
+    missing_cols = [col for col in feature_columns if col not in df_clean.columns]
+    if missing_cols:
+        print(f"Missing columns: {missing_cols}")
+        print(f"Available columns: {list(df_clean.columns)}")
+        raise ValueError(f"Missing required columns: {missing_cols}")
     
-    df_clean['total_network'] = df_clean['Avg_Recieve_Kbps'] + df_clean['Avg_Transmit_Kbps']
+    # Extract features and target
+    X = df_clean[feature_columns].copy()
+    y_original = df_clean['Class_Name'].copy()  # Use actual column name
     
-    df_clean['resource_intensity'] = (
-        df_clean['total_jobs'] * 0.3 + 
-        df_clean['Mem capacity'] * 0.2 + 
-        df_clean['Disk_capacity_GB'] * 0.2 +
-        df_clean['Num_of_CPU_Cores'] * df_clean['CPU_speed_per_Core'] * 0.3
-    )
+    # Map to 3-class system for ML service compatibility
+    y_mapped = map_to_three_classes(y_original)
     
-    df_clean['network_ratio'] = np.where(
-        df_clean['Avg_Transmit_Kbps'] > 0,
-        df_clean['Avg_Recieve_Kbps'] / df_clean['Avg_Transmit_Kbps'],
-        df_clean['Avg_Recieve_Kbps']
-    )
+    print(f"\nClass mapping applied:")
+    print(f"  Original classes: {sorted(y_original.unique())}")
+    print(f"  Mapped classes: {sorted(np.unique(y_mapped))}")
     
-    feature_columns.extend(['total_jobs', 'total_network', 'resource_intensity', 'network_ratio'])
+    # Check class distribution after mapping
+    mapped_dist = Counter(y_mapped)
+    print(f"\nMapped class distribution:")
+    total_samples = len(y_mapped)
+    for cls, count in sorted(mapped_dist.items()):
+        percentage = (count / total_samples) * 100
+        print(f"  {cls}: {count:,} samples ({percentage:.2f}%)")
     
-    # Remove outliers (simple IQR method)
+    # Handle missing values in features
+    print(f"\nHandling missing values...")
     for col in feature_columns:
-        if col in df_clean.columns:
-            Q1 = df_clean[col].quantile(0.25)
-            Q3 = df_clean[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            
-            before_count = len(df_clean)
-            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-            outliers_removed = before_count - len(df_clean)
-            
-            if outliers_removed > 0:
-                print(f"Removed {outliers_removed:,} outliers from {col}")
+        missing_count = X[col].isnull().sum()
+        if missing_count > 0:
+            print(f"  {col}: {missing_count} missing values -> filled with median")
+            X[col] = X[col].fillna(X[col].median())
     
-    print(f"Final processed data shape: {df_clean.shape}")
-    print(f"Class distribution:\n{df_clean['Class_Name'].value_counts()}")
+    # Remove outliers using IQR method for each feature
+    print(f"\nRemoving outliers...")
+    initial_size = len(X)
+    for col in feature_columns:
+        Q1 = X[col].quantile(0.25)
+        Q3 = X[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        # Create mask for valid values
+        valid_mask = (X[col] >= lower_bound) & (X[col] <= upper_bound)
+        X = X[valid_mask]
+        y_mapped = y_mapped[valid_mask]
     
-    X = df_clean[feature_columns]
-    y = df_clean['Class_Name']  # Use actual target column
+    final_size = len(X)
+    removed_count = initial_size - final_size
+    print(f"  Removed {removed_count:,} outliers ({(removed_count/initial_size)*100:.2f}%)")
+    print(f"  Final dataset size: {final_size:,} samples")
     
-    return X, y, feature_columns
+    # Final class distribution check
+    final_dist = Counter(y_mapped)
+    print(f"\nFinal class distribution after cleaning:")
+    for cls, count in sorted(final_dist.items()):
+        percentage = (count / len(y_mapped)) * 100
+        print(f"  {cls}: {count:,} samples ({percentage:.2f}%)")
+    
+    return X.values, y_mapped, feature_columns
 
 def train_balanced_svm_model(X, y, feature_names, n_jobs=4):
     """Train SVM with fixed progress tracking and memory management"""
@@ -562,19 +591,23 @@ def train_balanced_svm_model(X, y, feature_names, n_jobs=4):
     return best_svm, scaler, label_encoder, svm_grid, balanced_acc
 
 def test_svm_scenarios(svm_model, scaler, label_encoder, feature_names):
-    """Test SVM with example scenarios"""
+    """Test SVM với realistic scenarios using 3-class system"""
     print(f"\n=== TESTING SVM SCENARIOS ===")
     
-    # Updated test scenarios based on actual feature structure
+    # Updated test scenarios for 3-class system using actual feature names
+    # [Jobs_per_ 1Minute, Jobs_per_ 5 Minutes, Jobs_per_ 15Minutes, Mem capacity, Disk_capacity_GB, Num_of_CPU_Cores, CPU_speed_per_Core, Avg_Recieve_Kbps, Avg_Transmit_Kbps]
     test_scenarios = [
-        # [Jobs_1min, Jobs_5min, Jobs_15min, Mem, Disk, CPU_Cores, CPU_Speed, Recv_Kbps, Trans_Kbps, total_jobs, total_network, resource_intensity, network_ratio]
-        [3.0, 4.0, 5.0, 8192, 500.0, 4, 2400, 10.0, 5.0, 4.0, 15.0, 2500.0, 2.0],     # Very Low workload
-        [50.0, 55.0, 60.0, 16384, 1000.0, 8, 3200, 100.0, 80.0, 55.0, 180.0, 15000.0, 1.25],  # Low workload  
-        [150.0, 160.0, 170.0, 32768, 2000.0, 16, 3600, 500.0, 400.0, 160.0, 900.0, 45000.0, 1.25],  # Medium workload
-        [300.0, 320.0, 350.0, 65536, 4000.0, 32, 4000, 1000.0, 800.0, 323.3, 1800.0, 95000.0, 1.25],  # High workload
+        # Small workload - Low job rate, small memory/disk
+        [3.0, 4.2, 5.0, 8192, 500.0, 4, 2400, 10.0, 5.0],     
+        # Small workload - Slightly higher but still small
+        [12.0, 13.7, 15.0, 16384, 1000.0, 8, 3200, 50.0, 25.0],  
+        # Medium workload - Moderate job rate and resources
+        [150.0, 160.0, 170.0, 32768, 2000.0, 16, 3600, 500.0, 400.0],  
+        # Large workload - High job rate, large memory/disk  
+        [300.0, 320.0, 350.0, 65536, 4000.0, 32, 4000, 1000.0, 800.0],  
     ]
     
-    expected_classes = ['\'Very Low\'', '\'Low\'', '\'Medium\'', '\'High\'']
+    expected_classes = ['small', 'small', 'medium', 'large']
     
     for i, (scenario, expected) in enumerate(zip(test_scenarios, expected_classes)):
         scenario_df = pd.DataFrame([scenario], columns=feature_names)
@@ -587,10 +620,10 @@ def test_svm_scenarios(svm_model, scaler, label_encoder, feature_names):
         print(f"\nScenario {i+1}: {expected} workload")
         print(f"  Predicted: {prediction_label}")
         print(f"  Probabilities: {dict(zip(label_encoder.classes_, probabilities))}")
-        print(f"  CORRECT" if prediction_label == expected else f"  WRONG (expected {expected})")
+        print(f"  ✅ CORRECT" if prediction_label == expected else f"  ❌ WRONG (expected {expected})")
 
 def save_balanced_svm_model(svm_model, scaler, label_encoder, grid_search, feature_names, balanced_accuracy):
-    """Save trained model and metadata"""
+    """Save trained model and metadata with ML service compatible filenames"""
     print(f"\n=== SAVING MODEL ===")
     
     os.makedirs('models', exist_ok=True)
@@ -598,6 +631,18 @@ def save_balanced_svm_model(svm_model, scaler, label_encoder, grid_search, featu
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     accuracy_str = f"{balanced_accuracy*100:.1f}pct"
     
+    # Save individual components with ML service expected filenames
+    joblib.dump(svm_model, 'models/svm_model.joblib')
+    joblib.dump(scaler, 'models/svm_scaler.joblib') 
+    joblib.dump(label_encoder, 'models/svm_label_encoder.joblib')
+    joblib.dump(feature_names, 'models/svm_feature_names.joblib')
+    
+    print(f"✅ SVM Model saved: models/svm_model.joblib")
+    print(f"✅ SVM Scaler saved: models/svm_scaler.joblib")
+    print(f"✅ SVM Label Encoder saved: models/svm_label_encoder.joblib")
+    print(f"✅ SVM Features saved: models/svm_feature_names.joblib")
+    
+    # Also save backup with timestamp
     model_data = {
         'svm_model': svm_model,
         'scaler': scaler,
@@ -606,19 +651,13 @@ def save_balanced_svm_model(svm_model, scaler, label_encoder, grid_search, featu
         'best_params': grid_search.best_params_ if hasattr(grid_search, 'best_params_') else {},
         'balanced_accuracy': balanced_accuracy,
         'timestamp': timestamp,
-        'version': '2.1-realworld'
+        'version': '3.0-compatible',
+        'class_system': '3-class (small/medium/large)'
     }
     
-    model_filename = f'models/balanced_svm_model_{accuracy_str}_{timestamp}.pkl'
-    joblib.dump(model_data, model_filename, compress=3)
-    print(f"Model saved: {model_filename}")
-    
-    # Create latest symlink
-    latest_link = 'models/balanced_svm_model_latest.pkl'
-    if os.path.exists(latest_link):
-        os.remove(latest_link)
-    os.symlink(os.path.basename(model_filename), latest_link)
-    print(f"Latest model link: {latest_link}")
+    backup_filename = f'models/svm_backup_{accuracy_str}_{timestamp}.pkl'
+    joblib.dump(model_data, backup_filename, compress=3)
+    print(f"📦 Backup saved: {backup_filename}")
     
     # Save metadata
     metadata = {
@@ -627,16 +666,23 @@ def save_balanced_svm_model(svm_model, scaler, label_encoder, grid_search, featu
         'feature_names': feature_names,
         'best_params': model_data['best_params'],
         'classes': list(label_encoder.classes_),
-        'version': '2.1-realworld'
+        'version': '3.0-compatible',
+        'class_system': '3-class (small/medium/large)',
+        'compatible_with': 'ml_service.py'
     }
     
+    # Save SVM info for integration tests
+    joblib.dump(metadata, 'models/svm_info.joblib')
+    print(f"📋 SVM Info saved: models/svm_info.joblib")
+    
+    # Save JSON metadata for human reading
     metadata_filename = f'models/svm_metadata_{timestamp}.json'
     import json
     with open(metadata_filename, 'w') as f:
         json.dump(metadata, f, indent=2)
-    print(f"Metadata saved: {metadata_filename}")
+    print(f"📄 JSON Metadata saved: {metadata_filename}")
     
-    return model_filename
+    return backup_filename
 
 def main():
     """Main training pipeline"""
