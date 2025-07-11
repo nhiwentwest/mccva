@@ -313,30 +313,28 @@ def predict_makespan():
         features = data["features"]
         
         # Validate input
-        if len(features) != 10:
-            return jsonify({"error": "Expected 10 features: [jobs_1min, jobs_5min, memory_gb, cpu_cores, cpu_speed, network_receive, network_transmit, network_total, resource_density, workload_intensity]"}), 400
+        if len(features) != 9:
+            return jsonify({"error": "Expected 9 features: [jobs_1min, jobs_5min, jobs_15min, memory_mb, disk_gb, cpu_cores, cpu_speed, network_receive_kbps, network_transmit_kbps]"}), 400
         
         # Validate ranges (updated for ACTUAL trained features)
         if not (0 <= features[0] <= 100):  # jobs_1min
             return jsonify({"error": "Jobs per 1 minute must be between 0-100"}), 400
         if not (0 <= features[1] <= 500):  # jobs_5min
             return jsonify({"error": "Jobs per 5 minutes must be between 0-500"}), 400
-        if not (0.1 <= features[2] <= 64):  # memory_gb
-            return jsonify({"error": "Memory must be between 0.1-64 GB"}), 400
-        if not (1 <= features[3] <= 16):  # cpu_cores
-            return jsonify({"error": "CPU cores must be between 1-16"}), 400
-        if not (1.0 <= features[4] <= 5.0):  # cpu_speed
-            return jsonify({"error": "CPU speed must be between 1.0-5.0 GHz"}), 400
-        if not (0 <= features[5] <= 10000):  # network_receive
+        if not (0 <= features[2] <= 1500):  # jobs_15min
+            return jsonify({"error": "Jobs per 15 minutes must be between 0-1500"}), 400
+        if not (1024 <= features[3] <= 65536):  # memory_mb
+            return jsonify({"error": "Memory must be between 1024-65536 MB"}), 400
+        if not (10 <= features[4] <= 5000):  # disk_gb
+            return jsonify({"error": "Disk capacity must be between 10-5000 GB"}), 400
+        if not (1 <= features[5] <= 32):  # cpu_cores
+            return jsonify({"error": "CPU cores must be between 1-32"}), 400
+        if not (1000 <= features[6] <= 5000):  # cpu_speed_mhz
+            return jsonify({"error": "CPU speed must be between 1000-5000 MHz"}), 400
+        if not (0 <= features[7] <= 10000):  # network_receive
             return jsonify({"error": "Network receive must be between 0-10000 Kbps"}), 400
-        if not (0 <= features[6] <= 10000):  # network_transmit
+        if not (0 <= features[8] <= 10000):  # network_transmit
             return jsonify({"error": "Network transmit must be between 0-10000 Kbps"}), 400
-        if not (0 <= features[7] <= 20000):  # network_total
-            return jsonify({"error": "Network total must be between 0-20000 Kbps"}), 400
-        if not (0.01 <= features[8] <= 64):  # resource_density
-            return jsonify({"error": "Resource density must be between 0.01-64"}), 400
-        if not (0.01 <= features[9] <= 100):  # workload_intensity
-            return jsonify({"error": "Workload intensity must be between 0.01-100"}), 400
         
         # Chuẩn hóa dữ liệu
         features_scaled = svm_scaler.transform([features])
@@ -551,13 +549,14 @@ def get_models_info():
 @cache_prediction
 def predict_enhanced():
     """
-    Enhanced API với ensemble learning - kết hợp SVM và K-Means
+    Enhanced API với ensemble learning - kết hợp K-Means và Rule-based
+    FIXED: Removed invalid SVM feature conversion (5->10 features is meaningless)
     Input: {"features": [cpu_cores, memory, storage, network_bandwidth, priority], "vm_features": [cpu_usage, ram_usage, storage_usage]}
     Output: {"makespan": "small|medium|large", "cluster": int, "confidence": float, "model_contributions": {...}}
     """
     try:
-        if svm_model is None or kmeans_model is None or svm_scaler is None or kmeans_scaler is None:
-            return jsonify({"error": "Models not loaded"}), 503
+        if kmeans_model is None or kmeans_scaler is None:
+            return jsonify({"error": "K-Means model not loaded"}), 503
         
         data = request.get_json()
         if not data:
@@ -574,12 +573,12 @@ def predict_enhanced():
             return jsonify({"error": "Expected 3 VM features: [cpu_usage, ram_usage, storage_usage]"}), 400
         
         # Validate ranges
-        if not (1 <= features[0] <= 16):  # cpu_cores
-            return jsonify({"error": "CPU cores must be between 1-16"}), 400
-        if not (1 <= features[1] <= 64):  # memory_gb
-            return jsonify({"error": "Memory must be between 1-64 GB"}), 400
-        if not (10 <= features[2] <= 1000):  # storage_gb
-            return jsonify({"error": "Storage must be between 10-1000 GB"}), 400
+        if not (1 <= features[0] <= 32):  # cpu_cores
+            return jsonify({"error": "CPU cores must be between 1-32"}), 400
+        if not (1 <= features[1] <= 128):  # memory_gb
+            return jsonify({"error": "Memory must be between 1-128 GB"}), 400
+        if not (10 <= features[2] <= 5000):  # storage_gb
+            return jsonify({"error": "Storage must be between 10-5000 GB"}), 400
         if not (100 <= features[3] <= 10000):  # network_bandwidth
             return jsonify({"error": "Network bandwidth must be between 100-10000 Mbps"}), 400
         if not (1 <= features[4] <= 5):  # priority
@@ -593,71 +592,30 @@ def predict_enhanced():
         # Enhanced feature engineering
         enhanced_features = extract_enhanced_features(features)
         
-        # Convert 5 features to 10 features for SVM model
-        cpu_cores, memory, storage, network_bandwidth, priority = features
-        
-        # Calculate the additional 5 features needed for the 10-feature model
-        cpu_memory_ratio = cpu_cores / (memory + 1e-6)
-        storage_memory_ratio = storage / (memory + 1e-6)
-        network_cpu_ratio = network_bandwidth / (cpu_cores + 1e-6)
-        resource_intensity = (cpu_cores * memory * storage) / 1000
-        priority_weighted_cpu = cpu_cores * priority
-        
-        # Combine all 10 features for SVM model
-        svm_features = [
-            cpu_cores, memory, storage, network_bandwidth, priority,
-            cpu_memory_ratio, storage_memory_ratio, network_cpu_ratio,
-            resource_intensity, priority_weighted_cpu
-        ]
-        
-        # Model 1: SVM Prediction with 10 features
-        features_scaled = svm_scaler.transform([svm_features])
-        svm_prediction_int = svm_model.predict(features_scaled)[0]
-        svm_decision_scores = svm_model.decision_function(features_scaled)
-        svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
-        
-        # Map SVM integer prediction to string label (EXACT as training)
-        # Training mapping: {'large': 0, 'medium': 1, 'small': 2}
-        # Load label encoder for correct mapping
-        try:
-            import joblib
-            label_encoder = joblib.load('models/label_encoder.joblib')
-            svm_prediction = label_encoder.inverse_transform([int(svm_prediction_int)])[0]
-        except:
-            # Fallback mapping based on training: {large: 0, medium: 1, small: 2}
-            svm_class_mapping = {0: "large", 1: "medium", 2: "small"}
-            svm_prediction = svm_class_mapping.get(int(svm_prediction_int), "medium")
-        
-        # Model 2: K-Means Prediction
+        # Model 1: K-Means Prediction (using 3 VM features)
         vm_scaled = kmeans_scaler.transform([vm_features])
         kmeans_cluster = int(kmeans_model.predict(vm_scaled)[0])
         kmeans_distances = kmeans_model.transform(vm_scaled)[0]
         kmeans_confidence = float(1 / (1 + np.min(kmeans_distances)))  # Closer to centroid = higher confidence
         
-        # Model 3: Rule-based Heuristic
+        # Model 2: Rule-based Heuristic
         rule_prediction, rule_confidence = get_rule_based_prediction(enhanced_features)
         
-        # Ensemble Decision
-        ensemble_result = ensemble_decision(
-            svm_prediction, svm_confidence,
+        # Ensemble Decision (K-Means + Rule-based only)
+        ensemble_result = ensemble_decision_simplified(
             kmeans_cluster, kmeans_confidence,
             rule_prediction, rule_confidence,
             enhanced_features
         )
         
-        logger.info(f"Enhanced prediction: {ensemble_result}")
+        logger.info(f"Enhanced prediction (K-Means + Rules): {ensemble_result}")
         
         return jsonify({
             "makespan": ensemble_result["makespan"],
             "cluster": ensemble_result["cluster"],
             "confidence": ensemble_result["confidence"],
+            "method": "Enhanced_KMeans_Rules",
             "model_contributions": {
-                "svm": {
-                    "prediction": svm_prediction,
-                    "prediction_int": int(svm_prediction_int),
-                    "confidence": svm_confidence,
-                    "weight": ensemble_result["weights"]["svm"]
-                },
                 "kmeans": {
                     "prediction": kmeans_cluster,
                     "confidence": kmeans_confidence,
@@ -670,6 +628,7 @@ def predict_enhanced():
                 }
             },
             "enhanced_features": enhanced_features,
+            "note": "SVM prediction removed - use /predict/makespan with 9 features or /predict/mccva_complete for full pipeline",
             "timestamp": datetime.now().isoformat()
         })
         
@@ -1072,6 +1031,55 @@ def ensemble_decision(svm_pred, svm_conf, kmeans_cluster, kmeans_conf, rule_pred
     
     return result
 
+def ensemble_decision_simplified(kmeans_cluster, kmeans_conf, rule_pred, rule_conf, enhanced_features):
+    """
+    Simplified ensemble decision for K-Means + Rule-based only
+    """
+    # Adaptive weights based on confidence
+    total_confidence = kmeans_conf + rule_conf
+    if total_confidence > 0:
+        kmeans_weight = kmeans_conf / total_confidence
+        rule_weight = rule_conf / total_confidence
+    else:
+        kmeans_weight = 0.5
+        rule_weight = 0.5
+    
+    # Soft voting
+    makespan_scores = {"small": 0, "medium": 0, "large": 0}
+    
+    # Rule-based contribution  
+    makespan_scores[rule_pred] += rule_weight
+    
+    # K-Means contribution with soft mapping
+    cluster_to_workload = {
+        0: {"small": 0.7, "medium": 0.3, "large": 0.0},
+        1: {"small": 0.5, "medium": 0.4, "large": 0.1},
+        2: {"small": 0.3, "medium": 0.6, "large": 0.1},
+        3: {"small": 0.1, "medium": 0.7, "large": 0.2},
+        4: {"small": 0.0, "medium": 0.5, "large": 0.5},
+        5: {"small": 0.0, "medium": 0.3, "large": 0.7}
+    }
+    
+    cluster_mapping = cluster_to_workload.get(kmeans_cluster, 
+                                            {"small": 0.33, "medium": 0.33, "large": 0.33})
+    
+    for workload, prob in cluster_mapping.items():
+        makespan_scores[workload] += kmeans_weight * prob
+    
+    # Final decision
+    final_makespan = max(makespan_scores, key=makespan_scores.get)
+    
+    # Calculate ensemble confidence
+    ensemble_confidence = max(makespan_scores.values()) / sum(makespan_scores.values())
+    
+    return {
+        "makespan": final_makespan,
+        "cluster": kmeans_cluster,
+        "confidence": ensemble_confidence,
+        "weights": {"kmeans": kmeans_weight, "rule": rule_weight},
+        "makespan_scores": makespan_scores
+    }
+
 @app.route('/admin/metrics', methods=['GET'])
 @performance_tracker
 def get_metrics():
@@ -1266,6 +1274,7 @@ def compare_predictions():
     """
     🔬 PREDICTION COMPARISON ENDPOINT
     So sánh predictions từ individual models vs ensemble
+    FIXED: Updated to use correct 9-feature SVM model
     """
     try:
         if svm_model is None or kmeans_model is None:
@@ -1278,20 +1287,20 @@ def compare_predictions():
         features = data["features"]
         vm_features = data.get("vm_features", [0.5, 0.5, 0.5])
         
-        # Validate features for comparison
-        if len(features) != 10:
-            return jsonify({"error": "Expected 10 features for comparison"}), 400
+        # Validate features for comparison - SVM model uses 9 features
+        if len(features) != 9:
+            return jsonify({"error": "Expected 9 features for SVM: [jobs_1min, jobs_5min, jobs_15min, memory_mb, disk_gb, cpu_cores, cpu_speed, network_receive_kbps, network_transmit_kbps]"}), 400
         
         start_time = time.time()
         
-        # Individual SVM prediction
+        # Individual SVM prediction (9 features)
         features_scaled = svm_scaler.transform([features])
         svm_pred_numeric = svm_model.predict(features_scaled)[0]
         svm_prediction = svm_label_encoder.inverse_transform([svm_pred_numeric])[0]
         svm_decision_scores = svm_model.decision_function(features_scaled)
         svm_confidence = float(np.abs(svm_decision_scores[0])) if not isinstance(svm_decision_scores[0], np.ndarray) else float(np.max(np.abs(svm_decision_scores[0])))
         
-        # Individual K-Means prediction
+        # Individual K-Means prediction (3 VM features)
         vm_scaled = kmeans_scaler.transform([vm_features])
         kmeans_cluster = int(kmeans_model.predict(vm_scaled)[0])
         kmeans_distances = kmeans_model.transform(vm_scaled)[0]
@@ -1333,7 +1342,8 @@ def compare_predictions():
                 'svm_vs_ensemble': svm_prediction == ensemble_decision,
                 'processing_time_ms': processing_time * 1000,
                 'features_used': features,
-                'vm_features_used': vm_features
+                'vm_features_used': vm_features,
+                'note': 'SVM model uses 9 features as actually trained'
             },
             'timestamp': datetime.now().isoformat()
         })
@@ -1456,20 +1466,22 @@ def predict_mccva_complete():
         vm_memory_usage = data.get("vm_memory_usage", 0.5)
         vm_storage_usage = data.get("vm_storage_usage", 0.5)
         
-        # STAGE 1: SVM Prediction - Convert to 10 features
-        jobs_1min = max(1, int(cpu_cores * priority))
+        # STAGE 1: SVM Prediction - Convert to 9 features (as actually trained)
+        # [Jobs_per_ 1Minute, Jobs_per_ 5 Minutes, Jobs_per_ 15Minutes, Mem capacity, Disk_capacity_GB, Num_of_CPU_Cores, CPU_speed_per_Core, Avg_Recieve_Kbps, Avg_Transmit_Kbps]
+        
+        jobs_1min = max(1.0, float(cpu_cores * priority))
         jobs_5min = jobs_1min * 5
-        cpu_speed = 2.0 + (priority - 1) * 0.3  # Estimate based on priority
-        network_receive = network_bandwidth * 0.6
-        network_transmit = network_bandwidth * 0.4
-        network_total = network_receive + network_transmit
-        resource_density = memory_gb / (cpu_cores + 0.1)
-        workload_intensity = jobs_1min / (cpu_cores + 0.1)
+        jobs_15min = jobs_1min * 15
+        memory_mb = memory_gb * 1024  # Convert GB to MB 
+        disk_gb = storage_gb
+        cpu_speed_mhz = 2000 + (priority - 1) * 300  # Estimate based on priority (2000-3200 MHz)
+        network_receive_kbps = network_bandwidth * 0.6  # 60% receive
+        network_transmit_kbps = network_bandwidth * 0.4  # 40% transmit
         
         svm_features = [
-            jobs_1min, jobs_5min, memory_gb, cpu_cores, cpu_speed,
-            network_receive, network_transmit, network_total,
-            resource_density, workload_intensity
+            jobs_1min, jobs_5min, jobs_15min, 
+            memory_mb, disk_gb, cpu_cores, cpu_speed_mhz,
+            network_receive_kbps, network_transmit_kbps
         ]
         
         # SVM Prediction
