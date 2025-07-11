@@ -115,35 +115,45 @@ curl http://localhost:5000/health
 
 #### B. Test SVM Prediction
 ```bash
-# Test single prediction
+# ❌ OLD - Wrong format (5 features)
+# curl -X POST http://localhost:5000/predict/makespan \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "cpu_cores": 8,
+#     "memory": 32,
+#     "storage": 500,
+#     "network_bandwidth": 10000,
+#     "priority": 1
+#   }'
+
+# ✅ NEW - Correct format (10 features)
 curl -X POST http://localhost:5000/predict/makespan \
   -H "Content-Type: application/json" \
   -d '{
-    "cpu_cores": 8,
-    "memory": 32,
-    "storage": 500,
-    "network_bandwidth": 10000,
-    "priority": 1
+    "features": [50, 250, 32, 8, 3.2, 6000, 4000, 10000, 4.0, 6.25]
   }'
 
-# Should now return "large" instead of "small"
+# Features explanation: [jobs_1min, jobs_5min, memory_gb, cpu_cores, cpu_speed, network_receive, network_transmit, network_total, resource_density, workload_intensity]
+# Should now return "large" for heavy workload
 ```
 
-#### C. Test Full MCCVA Pipeline
+#### C. Test Full MCCVA Pipeline (RECOMMENDED)
 ```bash
-# Test complete pipeline
+# ✅ EASY - Complete 3-stage pipeline with simple inputs
 curl -X POST http://localhost:5000/predict/mccva_complete \
   -H "Content-Type: application/json" \
   -d '{
     "cpu_cores": 8,
-    "memory": 32,
-    "storage": 500,
+    "memory_gb": 32,
+    "storage_gb": 500,
     "network_bandwidth": 10000,
     "priority": 1,
-    "cpu_usage": 95.8,
-    "memory_usage": 88.5,
-    "storage_usage": 75.2
+    "vm_cpu_usage": 0.958,
+    "vm_memory_usage": 0.885,
+    "vm_storage_usage": 0.752
   }'
+
+# This automatically converts to 10 features for SVM, 5 features for K-Means, and 13 features for Meta-Learning
 ```
 
 ### 8. 🎯 Run Demo Test
