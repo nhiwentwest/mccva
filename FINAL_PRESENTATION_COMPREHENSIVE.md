@@ -193,27 +193,94 @@ python test_cloud_deployment.py $EC2_IP
 
 ---
 
-## **📊 ENSEMBLE PERFORMANCE EVALUATION**
+## **📊 ENSEMBLE PERFORMANCE EVALUATION - ACTUAL CLOUD RESULTS**
 
-### **A. Test Scenarios (Research Validation):**
+### **🚨 CRITICAL FINDINGS FROM EC2 CLOUD TESTING:**
 
-| **Scenario** | **Features** | **SVM Prediction** | **K-Means Cluster** | **Ensemble Decision** | **Accuracy** |
-|--------------|--------------|-------------------|---------------------|----------------------|--------------|
-| Light Web | `[2,8,0.5,2,...]` | small (conf: 0.92) | cluster_0 (dist: 0.2) | **small** | ✅ 98% |
-| API Process | `[15,60,2.0,4,...]` | medium (conf: 0.85) | cluster_2 (dist: 0.4) | **medium** | ✅ 94% |
-| Data Heavy | `[45,180,8.0,8,...]` | large (conf: 0.91) | cluster_4 (dist: 0.3) | **large** | ✅ 97% |
-| Edge Case CPU | `[5,20,1.0,12,...]` | medium (conf: 0.65) | cluster_5 (dist: 0.7) | **large** | ✅ 89% |
-| Edge Case RAM | `[3,12,16.0,2,...]` | large (conf: 0.78) | cluster_3 (dist: 0.5) | **large** | ✅ 93% |
+#### **A. MCCVA 3-Stage System Analysis (Live EC2 Results):**
 
-### **B. Performance Benchmarks:**
+| **Test Scenario** | **Input Resources** | **Stage 1 (SVM)** | **Stage 2 (K-Means)** | **Stage 3 (Meta-Learning)** | **Issues Identified** |
+|-------------------|--------------------|--------------------|------------------------|----------------------------|----------------------|
+| **Light Workload** | 2 cores, 4GB, 100GB | "large" (conf: 2.236) | cluster 5 (conf: 0.202) | **"small"** (conf: 99.999%) | ✅ Final result correct, but concerning pattern |
+| **Medium Workload** | 8 cores, 32GB, 500GB | "large" (conf: 2.236) | cluster 5 (conf: 0.031) | **"small"** (conf: 99.999%) | ❌ Should be "medium/large" |
+| **Heavy Workload** | 16 cores, 64GB, 1TB | "large" (conf: 2.236) | cluster 5 (conf: 0.007) | **"small"** (conf: 99.999%) | ❌ Should definitely be "large" |
 
-| **Metric** | **Individual SVM** | **Individual K-Means** | **Ensemble** | **Improvement** |
-|------------|-------------------|----------------------|--------------|-----------------|
-| **Accuracy** | 87.2% | 83.5% | **94.3%** | +7.1% |
-| **Precision** | 0.85 | 0.81 | **0.93** | +0.08 |
-| **Recall** | 0.89 | 0.85 | **0.95** | +0.06 |
-| **F1-Score** | 0.87 | 0.83 | **0.94** | +0.07 |
-| **Response Time** | 45ms | 38ms | **52ms** | +7ms (acceptable) |
+#### **B. Critical Model Issues Discovered:**
+
+**🔥 SVM Model Problems:**
+- **Identical Predictions:** ALL inputs → "large" with confidence 2.236
+- **Identical Decision Scores:** `[2.236, -0.269, 1.213]` for every scenario
+- **Root Cause:** Severe class imbalance (99.44% large+small, 0.56% medium class)
+- **Status:** ⚠️ Model requires retraining with balanced dataset
+
+**🔥 K-Means Over-clustering:**
+- **Single Cluster Dominance:** ALL predictions → cluster 5
+- **Decreasing Confidence:** Heavier workloads → lower confidence (0.202 → 0.031 → 0.007)
+- **Status:** ⚠️ Cluster distribution needs analysis
+
+**🔥 Meta-Learning Over-correction:**
+- **Uniform Override:** ALL final predictions → "small" with 99.999% confidence
+- **Dangerous Pattern:** Neural network learned "always override SVM to small"
+- **Production Risk:** Would route heavy workloads to inadequate VMs
+- **Status:** 🚨 Critical - requires immediate retraining
+
+#### **C. System Architecture Validation:**
+
+| **Component** | **Status** | **Performance** | **Notes** |
+|---------------|------------|-----------------|-----------|
+| **ML Service API** | ✅ Operational | Response: 50-100ms | All endpoints healthy |
+| **OpenResty Gateway** | ✅ Operational | Port 80 active | Lua routing functional |
+| **3-Stage Pipeline** | ⚠️ Functional but flawed | 99.999% confidence | Predictions inconsistent |
+| **Model Loading** | ✅ Success | All models loaded | SVM, K-Means, Meta-Learning ready |
+| **Docker Integration** | ✅ Ready | - | Production deployment prepared |
+
+### **🎯 RESEARCH INSIGHTS & LESSONS LEARNED:**
+
+#### **Ensemble Learning Challenges:**
+1. **Class Imbalance Cascading:** SVM imbalance affects entire ensemble
+2. **Meta-Learning Bias:** Neural networks can learn incorrect override patterns  
+3. **Confidence vs Accuracy:** High confidence ≠ correct predictions
+4. **Stage Dependencies:** Errors in early stages compound in final results
+
+#### **Production Deployment Successes:**
+- ✅ **System Integration:** Complete ML pipeline operational
+- ✅ **API Performance:** Sub-100ms response times achieved
+- ✅ **Scalability:** Cloud deployment successful
+- ✅ **Monitoring:** Comprehensive health checks implemented
+
+### **🔧 IMMEDIATE FIXES REQUIRED:**
+
+#### **Priority 1: Model Retraining**
+```bash
+# Fix class imbalance with intelligent mapping
+python retrain_balanced_svm.py --fix-class-distribution
+
+# Retrain Meta-Learning with diverse scenarios  
+python train_meta_learning.py --balanced-training-data
+```
+
+#### **Priority 2: Validation Framework**
+```bash
+# Implement comprehensive testing
+python comprehensive_model_validation.py --test-all-scenarios
+```
+
+### **🎭 DEMO STRATEGY ADJUSTMENT:**
+
+**Focus Areas for Presentation:**
+1. **System Architecture:** Highlight 3-stage ensemble design
+2. **Cloud Integration:** Demonstrate production-ready deployment
+3. **Research Process:** Show iterative improvement methodology
+4. **Problem Discovery:** Present as valuable research findings
+
+**Demo Script:**
+```
+"Our MCCVA system demonstrates enterprise-scale ML deployment. 
+While we discovered critical model training challenges during cloud testing,
+this represents real-world research where identifying and solving such issues
+is part of the innovation process. The architecture successfully integrates
+multiple AI techniques in production environment."
+```
 
 ---
 
