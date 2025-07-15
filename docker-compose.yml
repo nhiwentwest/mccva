@@ -4,7 +4,7 @@ services:
   mccva-ml-service:
     build: .
     ports:
-      - "5000:5000"
+      - "5001:5000"  # Map port 5001 ngoài -> 5000 trong container
     environment:
       - HOST=0.0.0.0
       - PORT=5000
@@ -19,9 +19,75 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3" 
+    networks:
+      - mccva-network
+
+  mccva-gateway:
+    image: openresty/openresty:alpine
+    ports:
+      - "8080:80"  # Map port 8080 ngoài -> 80 trong container
+    volumes:
+      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./lua:/usr/local/openresty/nginx/lua:ro
+      - ./logs:/var/log/nginx:rw  # Thêm volume cho logs
+    command: /bin/sh -c "mkdir -p /var/log/nginx && nginx -g 'daemon off;'"
+    depends_on:
+      - mccva-ml-service
+    restart: unless-stopped
+    networks:
+      - mccva-network
+
+  mccva-vm-small:
+    build:
+      context: .
+      dockerfile: Dockerfile.vm
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_TYPE=small
+      - SERVER_PORT=8081
+      - SERVER_NAME=vm_small
+    volumes:
+      - ./mock_vm_server.py:/app/mock_vm_server.py:ro
+    command: python /app/mock_vm_server.py --type small --port 8081
+    restart: unless-stopped
+    networks:
+      - mccva-network
+
+  mccva-vm-medium:
+    build:
+      context: .
+      dockerfile: Dockerfile.vm
+    ports:
+      - "8083:8083"
+    environment:
+      - SERVER_TYPE=medium
+      - SERVER_PORT=8083
+      - SERVER_NAME=vm_medium
+    volumes:
+      - ./mock_vm_server.py:/app/mock_vm_server.py:ro
+    command: python /app/mock_vm_server.py --type medium --port 8083
+    restart: unless-stopped
+    networks:
+      - mccva-network
+
+  mccva-vm-large:
+    build:
+      context: .
+      dockerfile: Dockerfile.vm
+    ports:
+      - "8085:8085"
+    environment:
+      - SERVER_TYPE=large
+      - SERVER_PORT=8085
+      - SERVER_NAME=vm_large
+    volumes:
+      - ./mock_vm_server.py:/app/mock_vm_server.py:ro
+    command: python /app/mock_vm_server.py --type large --port 8085
+    restart: unless-stopped
+    networks:
+      - mccva-network
+
+networks:
+  mccva-network:
+    driver: bridge 

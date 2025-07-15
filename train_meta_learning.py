@@ -8,6 +8,8 @@ This script trains the Meta-Learning Neural Network that combines:
 - K-Means predictions (VM clustering)
 - Rule-based heuristics (business logic)
 
+Uses dataset from dataset/modified directory
+
 Architecture: Neural Network learns optimal combination weights instead of hardcoded if-else!
 Paper: "Machine Learning-based VM Load Balancing using Meta-Learning Approach"
 """

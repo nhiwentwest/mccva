@@ -39,7 +39,7 @@ local function get_prediction(workload)
     log(ngx.INFO, "Sending prediction request to ML service with payload: " .. cjson.encode(workload))
     
     -- Call ML service for prediction
-    local res, err = httpc:request_uri("http://mccva-ml-service:5000/predict/mccva_complete", {
+    local res, err = httpc:request_uri("http://mccva-ml-service:5001/predict/mccva_complete", {
         method = "POST",
         body = cjson.encode(workload),
         headers = {
@@ -63,6 +63,8 @@ local function get_prediction(workload)
             return nil, "ML service authentication failed (403 Forbidden)"
         end
         
+        return nil, "ML service error: " .. res.status
+        log(ngx.ERR, "Response body: " .. (res.body or "empty"))
         return nil, "ML service error: " .. res.status
     end
     
@@ -143,6 +145,20 @@ if ngx.req.get_method() == "POST" then
             elseif cpu >= 8 or memory >= 16 or storage >= 500 or priority >= 5 then
                 vm_type = "large"
             end
+        end
+        local memory = workload.memory_gb or 8
+        local storage = workload.storage_gb or 100
+        local network = workload.network_bandwidth or 1000
+        local priority = workload.priority or 3
+        
+        -- Simple rule-based allocation
+        local vm_type = "medium"  -- Default to medium
+        local confidence = 0.6    -- Default confidence
+        
+        if cpu <= 2 and memory <= 4 and storage <= 50 then
+            vm_type = "small"
+        elseif cpu >= 8 or memory >= 16 or storage >= 500 or priority >= 5 then
+            vm_type = "large"
         end
         
         prediction = {

@@ -72,4 +72,4 @@ data/temp/
 
 # Model artifacts (optional - keep essential models only)
 # models/old_*
-# models/backup_* 
+# models/backup_* backup_files/

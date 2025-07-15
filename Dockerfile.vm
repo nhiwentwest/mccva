@@ -1,0 +1,15 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir flask
+
+# Copy application
+COPY mock_vm_server.py .
+
+# Expose default port
+EXPOSE 8081
+
+# Command to run
+CMD ["python", "mock_vm_server.py"] 

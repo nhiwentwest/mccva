@@ -82,19 +82,6 @@ http {
         root /var/www/html;
         index index.html index.htm;
         
-        # Status endpoint
-        location /status {
-            content_by_lua_block {
-                ngx.header.content_type = "application/json";
-                ngx.say('{"status": "ok", "service": "mccva-gateway"}');
-            }
-        }
-        
-        # Classification endpoint
-        location /classify {
-            content_by_lua_file /usr/local/openresty/nginx/lua/mccva_routing.lua;
-        }
-        
         # Health check endpoint
         location /health {
             content_by_lua_block {
